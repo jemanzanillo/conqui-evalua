@@ -1,0 +1,73 @@
+Este proyecto es una transición de un Excel a una aplicación web, es el salto natural para digitalizar procesos de evaluación que suelen ser tediosos en papel o celdas estáticas en un encuentro presencial. Basate en las instrucciones de Prompt y en tener un flujo basado en Flow.
+
+Prompt:
+Crea una aplicación web para evaluación presencial de aspirantes a Guías Mayores. La aplicación debe ser "mobile-first", limpia y funcional.
+
+1. Estructura de Datos (Requisitos):
+
+Usa esta estructura para organizar la evaluación en 3 fases:
+
+EVA-1 (12 pts): Certificado bautismo, Cédula, Carta recomendación, Resumen/Video "Por qué GM", Talleres PBST, Libro Liderazgo, Cuestionario Dones, Reflexión Dones, Cuestionario Personalidad, Reflexión Personalidad, Diario devocional (1 mes), Libro El Camino a Cristo.
+
+EVA-2 (15 pts): Seminarios liderazgo (8 temas), Libro La Educación, Requisito Aptitud Física (Elegir 1 de 5 opciones), Especialidades Obligatorias (Agua, Campamento I y II, Seguridad, Temperancia), Especialidades Opcionales (Elegir 3 de 10: Caminata, Rescate, Nudos, etc.), Primeros Auxilios/RCP, Especialidad Santuario, Herencia Adventista (Elegir 1 de 4), Especialidad Evangelismo Personal.
+
+EVA-3 (11 pts): Miembro activo club 1 año, Enseñar 3 esp. Aventureros y 2 Conquistadores, Esp. Narración de Historias, Lectura 4 Evangelios y Deseado de todas las gentes, Reflexión 28 Creencias, Enseñar clase Biblia o 5 creencias, Especialidades Liderazgo (Elegir 3 de 5: Multiculturalidad, Redes Sociales, etc.), 3 Eventos sociales, Servicio Comunitario, Revisión antecedentes, Carpeta Final PDF.
+
+2. Lógica de Interfaz:
+
+Dashboard: Lista de aspirantes con búsqueda. Al seleccionar uno, abrir su perfil de evaluación.
+
+Navegación: Usa Tabs para cambiar entre EVA-1, EVA-2 y EVA-3.
+
+Items de Evaluación: >   - Cada requisito tiene un estado: Pendiente, Completado, Incompleto.
+
+Si se marca 'Incompleto', mostrar un dropdown de 'Motivos de fallo' (Falta firma, Incompleto, No cumple formato) y un campo de comentario.
+
+Requisitos de selección (ej. '3 de 10'): Mostrar sub-checkboxes; el requisito principal solo se marca completado si se seleccionan los mínimos requeridos.
+
+3. Sistema de Semaforización (Basado en EVA-1):
+
+Calcular puntaje en tiempo real en un sticky footer:
+
+Rojo (0-5 pts): "No aprobado. Requiere mayor preparación."
+
+Amarillo (6-8 pts): "Aprobado mínimo. Debe trabajar en áreas débiles."
+
+Verde (9-12 pts): "Excelente desempeño. Continúe así."
+
+4. Estética: Minimalista, profesional, con colores blanco, gris claro y acentos en azul o verde. Botones grandes para uso fácil con el pulgar.
+
+Flow:
+Flujo "Fast-Check" (Optimizado para Evaluadores)
+
+1. Selección de Aspirante y Fase
+
+Al abrir la app, aparece la lista de nombres (extraída de tu Excel: Beatriz, Katerin, etc.).
+
+El evaluador selecciona al aspirante y elige qué fase va a evaluar hoy: EVA-1, EVA-2 o EVA-3.
+
+2. Vista de Hoja de Cotejo Digital
+
+Los requisitos aparecen como una lista de Tarjetas de Acción.
+
+Cada tarjeta tiene un interruptor (Toggle) o un botón grande de "Completado".
+
+Lógica Especial (Especialidades): Para requisitos como "3 de las siguientes especialidades", la tarjeta muestra mini-checkboxes. La app marca el requisito como completado automáticamente cuando el evaluador toca el tercero.
+
+3. El Flujo de "Incompleto"
+
+Si el evaluador marca algo como Incompleto, se despliega inmediatamente (sin cambiar de pantalla) un pequeño formulario:
+
+Motivo: Botones de selección rápida (ej. "Contenido insuficiente", "Falta firma", "No cumple formato").
+
+Nota: Un campo de texto breve para el comentario personalizado.
+
+4. Tablero de Puntaje en Vivo (Sticky Footer)
+
+Mientras el evaluador marca requisitos, en la parte inferior de la pantalla aparece una barra persistente que muestra:
+
+Puntos: 8/12
+
+Estado: 🟡 Amarillo (Aprobado por el mínimo)
+
+Esto le da al evaluador una respuesta inmediata para decirle al aspirante en ese mismo momento cómo le fue.
