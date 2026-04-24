@@ -2,11 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { FASES } from "@/data/requisitos";
 import { puntajeFase, semaforo, porcentaje, type SemaforoEstado } from "@/lib/scoring";
-import { storage, type Aspirante } from "@/lib/storage";
+import { getEvaluacion } from "@/server/evaluaciones.functions";
+import type { Aspirante } from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
 
 const faseColor: Record<string, string> = {
   "EVA-1": "bg-orange-500",
@@ -26,7 +27,11 @@ type Props = {
 };
 
 export function AspiranteCard({ aspirante, onRemove }: Props) {
-  const ev = useMemo(() => storage.getEvaluacion(aspirante.id), [aspirante.id]);
+  const { data: ev = {} } = useQuery({
+    queryKey: ["evaluacion", aspirante.id],
+    queryFn: () => getEvaluacion({ data: { aspiranteId: aspirante.id } }),
+    staleTime: 30_000,
+  });
 
   return (
     <Card className="overflow-hidden">
