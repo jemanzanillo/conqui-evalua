@@ -5,23 +5,14 @@ import { useAspirantes } from "@/hooks/useAspirantes";
 import { AspiranteCard } from "@/components/AspiranteCard";
 import { NuevoAspiranteDialog } from "@/components/NuevoAspiranteDialog";
 import { Search, Users } from "lucide-react";
+import { HeaderUserMenu } from "../_authenticated";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Evaluación Guías Mayores" },
-      {
-        name: "description",
-        content:
-          "Aplicación mobile-first para evaluación presencial de aspirantes a Guías Mayores.",
-      },
-    ],
-  }),
+export const Route = createFileRoute("/_authenticated/")({
   component: Dashboard,
 });
 
 function Dashboard() {
-  const { aspirantes, add, remove } = useAspirantes();
+  const { aspirantes, isLoading, add, remove } = useAspirantes();
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -35,11 +26,14 @@ function Dashboard() {
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-3xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg font-bold leading-tight">Evaluación GM</h1>
               <p className="text-xs text-muted-foreground">Hoja de cotejo Z5 2026</p>
             </div>
-            <NuevoAspiranteDialog onCreate={(n) => add(n)} />
+            <div className="flex items-center gap-2">
+              <NuevoAspiranteDialog onCreate={(n) => add(n)} />
+              <HeaderUserMenu />
+            </div>
           </div>
           <div className="relative mt-3">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -54,7 +48,9 @@ function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-2 px-4 py-4">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">Cargando…</p>
+        ) : filtered.length === 0 ? (
           <EmptyState hasQuery={Boolean(q)} />
         ) : (
           filtered.map((a) => <AspiranteCard key={a.id} aspirante={a} onRemove={remove} />)
