@@ -1,17 +1,18 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { FASES, type Fase } from "@/data/requisitos";
-import { storage } from "@/lib/storage";
+import { getAspirante } from "@/server/aspirantes.functions";
 import { useEvaluacion } from "@/hooks/useEvaluacion";
 import { puntajeFase } from "@/lib/scoring";
 import { RequisitoCard } from "@/components/RequisitoCard";
 import { ScoreFooter } from "@/components/ScoreFooter";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/aspirante/$id")({
+export const Route = createFileRoute("/_authenticated/aspirante/$id")({
   component: AspirantePage,
   notFoundComponent: () => (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-4">
@@ -40,11 +41,23 @@ const faseAccent: Record<Fase, { active: string; dot: string }> = {
 
 function AspirantePage() {
   const { id } = Route.useParams();
-  const aspirante = useMemo(() => storage.getAspirante(id), [id]);
-  if (!aspirante) throw notFound();
+
+  const { data: aspirante, isLoading: aspLoading } = useQuery({
+    queryKey: ["aspirante", id],
+    queryFn: () => getAspirante({ data: { id } }),
+  });
 
   const { evaluacion, updateRequisito } = useEvaluacion(id);
   const [tab, setTab] = useState<Fase>("EVA-1");
+
+  if (aspLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      </div>
+    );
+  }
+  if (!aspirante) throw notFound();
 
   const faseActual = FASES.find((f) => f.id === tab)!;
   const { obtenidos, total } = puntajeFase(faseActual, evaluacion);
@@ -76,10 +89,7 @@ function AspirantePage() {
                 <TabsTrigger
                   key={f.id}
                   value={f.id}
-                  className={cn(
-                    "flex flex-col gap-0.5 py-2",
-                    faseAccent[f.id].active,
-                  )}
+                  className={cn("flex flex-col gap-0.5 py-2", faseAccent[f.id].active)}
                 >
                   <span className="text-xs font-semibold">{f.id}</span>
                   <span className="text-[10px] tabular-nums opacity-90">

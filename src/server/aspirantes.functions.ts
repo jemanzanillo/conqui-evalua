@@ -1,0 +1,76 @@
+import { createServerFn } from "@tanstack/react-start";
+import { useSession } from "@tanstack/react-start/server";
+import { and, asc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client.server";
+import { aspirantes } from "@/db/schema";
+import { getSessionConfig, type SessionData } from "./session.server";
+import type { Aspirante } from "@/lib/storage";
+
+async function requireUserId(): Promise<string> {
+  const session = await useSession<SessionData>(getSessionConfig());
+  const userId = session.data.userId;
+  if (!userId) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return userId;
+}
+
+function toAspirante(row: typeof aspirantes.$inferSelect): Aspirante {
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    fechaCreacion: row.fechaCreacion.toISOString(),
+  };
+}
+
+export const listAspirantes = createServerFn({ method: "GET" }).handler(
+  async (): Promise<Aspirante[]> => {
+    const userId = await requireUserId();
+    const rows = await db
+      .select()
+      .from(aspirantes)
+      .where(eq(aspirantes.ownerId, userId))
+      .orderBy(asc(aspirantes.nombre));
+    return rows.map(toAspirante);
+  },
+);
+
+export const getAspirante = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }): Promise<Aspirante | null> => {
+    const userId = await requireUserId();
+    const [row] = await db
+      .select()
+      .from(aspirantes)
+      .where(and(eq(aspirantes.id, data.id), eq(aspirantes.ownerId, userId)))
+      .limit(1);
+    return row ? toAspirante(row) : null;
+  });
+
+export const addAspirante = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ nombre: z.string().trim().min(1).max(120) }).parse(input),
+  )
+  .handler(async ({ data }): Promise<Aspirante> => {
+    const userId = await requireUserId();
+    const [row] = await db
+      .insert(aspirantes)
+      .values({ ownerId: userId, nombre: data.nombre })
+      .returning();
+    return toAspirante(row);
+  });
+
+export const removeAspirante = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    await db
+      .delete(aspirantes)
+      .where(and(eq(aspirantes.id, data.id), eq(aspirantes.ownerId, userId)));
+    return { ok: true };
+  });
