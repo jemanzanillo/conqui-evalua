@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client.server";
 import { aspirantes, evaluaciones } from "@/db/schema";
@@ -90,5 +90,5 @@ export const updateRequisito = createServerFn({ method: "POST" })
         set: updateSet,
       });
 
-    return { ok: true, ts: sql`now()` };
+    return { ok: true };
   });
