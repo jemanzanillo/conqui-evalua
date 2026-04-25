@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, redirect, useRouter } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
@@ -26,9 +26,9 @@ export const Route = createFileRoute("/login")({
         throw redirect({ to: search.redirect ?? "/" });
       }
     } catch (err) {
+      if (isRedirect(err)) throw err;
       // Si el server falla, mostramos el login igualmente — el usuario verá
       // el error específico al intentar entrar/registrarse.
-      if ((err as { isRedirect?: boolean })?.isRedirect) throw err;
     }
   },
   component: LoginPage,
