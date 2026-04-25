@@ -112,6 +112,7 @@ function AspirantePage() {
                   key={req.id}
                   requisito={req}
                   evaluacion={evaluacion[req.id]}
+                  faseLabel={f.id}
                   onChange={(patch) => updateRequisito(req.id, patch)}
                 />
               ))}
