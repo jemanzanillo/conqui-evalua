@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, redirect, useRouter } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
@@ -16,13 +16,19 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
   beforeLoad: async ({ context, search }) => {
-    const user = await context.queryClient.ensureQueryData({
-      queryKey: ["currentUser"],
-      queryFn: () => getCurrentUser(),
-      staleTime: 5 * 60 * 1000,
-    });
-    if (user) {
-      throw redirect({ to: search.redirect ?? "/" });
+    try {
+      const user = await context.queryClient.ensureQueryData({
+        queryKey: ["currentUser"],
+        queryFn: () => getCurrentUser(),
+        staleTime: 5 * 60 * 1000,
+      });
+      if (user) {
+        throw redirect({ to: search.redirect ?? "/" });
+      }
+    } catch (err) {
+      if (isRedirect(err)) throw err;
+      // Si el server falla, mostramos el login igualmente — el usuario verá
+      // el error específico al intentar entrar/registrarse.
     }
   },
   component: LoginPage,
