@@ -1,4 +1,8 @@
 // src/routes/signup.tsx
+export const Route = createFileRoute("/signup")({
+  component: SignupPage,
+});
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { signUp } from "@/server/auth.functions";
@@ -6,9 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 
-export const Route = createFileRoute("/signup")({
-  component: SignupPage,
-});
 
 function SignupPage() {
   const navigate = useNavigate();
