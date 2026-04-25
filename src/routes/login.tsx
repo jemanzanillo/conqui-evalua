@@ -16,13 +16,19 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
   beforeLoad: async ({ context, search }) => {
-    const user = await context.queryClient.ensureQueryData({
-      queryKey: ["currentUser"],
-      queryFn: () => getCurrentUser(),
-      staleTime: 5 * 60 * 1000,
-    });
-    if (user) {
-      throw redirect({ to: search.redirect ?? "/" });
+    try {
+      const user = await context.queryClient.ensureQueryData({
+        queryKey: ["currentUser"],
+        queryFn: () => getCurrentUser(),
+        staleTime: 5 * 60 * 1000,
+      });
+      if (user) {
+        throw redirect({ to: search.redirect ?? "/" });
+      }
+    } catch (err) {
+      // Si el server falla, mostramos el login igualmente — el usuario verá
+      // el error específico al intentar entrar/registrarse.
+      if ((err as { isRedirect?: boolean })?.isRedirect) throw err;
     }
   },
   component: LoginPage,
