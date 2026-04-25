@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  isRedirect,
   Outlet,
   redirect,
   useRouter,
@@ -12,11 +13,22 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ context, location }) => {
-    const user = await context.queryClient.ensureQueryData({
-      queryKey: ["currentUser"],
-      queryFn: () => getCurrentUser(),
-      staleTime: 5 * 60 * 1000,
-    });
+    let user: Awaited<ReturnType<typeof getCurrentUser>> = null;
+    try {
+      user = await context.queryClient.ensureQueryData({
+        queryKey: ["currentUser"],
+        queryFn: () => getCurrentUser(),
+        staleTime: 5 * 60 * 1000,
+      });
+    } catch (err) {
+      if (isRedirect(err)) throw err;
+      // Si el servidor falla (BD caída, secret faltante…), mandamos a login
+      // en vez de mostrar pantalla rota.
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.href },
+      });
+    }
     if (!user) {
       throw redirect({
         to: "/login",
