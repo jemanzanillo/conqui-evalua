@@ -6,7 +6,7 @@ import type { EvaluacionRequisito } from "@/lib/storage";
 import { isCompletado } from "@/lib/scoring";
 import { IncompletoForm } from "./IncompletoForm";
 import { RequisitoGuiaSheet } from "./RequisitoGuiaSheet";
-import { Check, Circle, X } from "lucide-react";
+import { Check, Circle, Clock, X } from "lucide-react";
 
 type Props = {
   requisito: Requisito;
