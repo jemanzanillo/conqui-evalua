@@ -4,12 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { FASES, type Fase } from "@/data/requisitos";
+import { type Fase } from "@/data/requisitos";
 import { getAspirante } from "@/server/aspirantes.functions";
 import { useEvaluacion } from "@/hooks/useEvaluacion";
+import { useFasesConOverrides } from "@/hooks/useFasesConOverrides";
 import { puntajeFase } from "@/lib/scoring";
 import { RequisitoCard } from "@/components/RequisitoCard";
 import { ScoreFooter } from "@/components/ScoreFooter";
+import { CopiarEvaButton } from "@/components/CopiarEvaButton";
+import { CompartirLinkButton } from "@/components/CompartirLinkButton";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/aspirante/$id")({
@@ -48,6 +51,7 @@ function AspirantePage() {
   });
 
   const { evaluacion, updateRequisito } = useEvaluacion(id);
+  const { fases } = useFasesConOverrides();
   const [tab, setTab] = useState<Fase>("EVA-1");
 
   if (aspLoading) {
@@ -59,7 +63,7 @@ function AspirantePage() {
   }
   if (!aspirante) throw notFound();
 
-  const faseActual = FASES.find((f) => f.id === tab)!;
+  const faseActual = fases.find((f) => f.id === tab)!;
   const { obtenidos, total } = puntajeFase(faseActual, evaluacion);
 
   return (
@@ -74,8 +78,14 @@ function AspirantePage() {
             </Link>
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold">{aspirante.nombre}</p>
-              <p className="text-xs text-muted-foreground">{faseActual.fecha}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {aspirante.zona ? `Zona ${aspirante.zona}` : ""}
+                {aspirante.zona && aspirante.club ? " · " : ""}
+                {aspirante.club ?? ""}
+                {!aspirante.zona && !aspirante.club ? faseActual.fecha : ""}
+              </p>
             </div>
+            <CompartirLinkButton shareToken={aspirante.shareToken} />
           </div>
         </div>
       </header>
@@ -83,7 +93,7 @@ function AspirantePage() {
       <main className="mx-auto max-w-3xl px-3 py-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Fase)}>
           <TabsList className="grid h-auto w-full grid-cols-3 gap-1 bg-muted p-1">
-            {FASES.map((f) => {
+            {fases.map((f) => {
               const { obtenidos: o, total: t } = puntajeFase(f, evaluacion);
               return (
                 <TabsTrigger
@@ -100,12 +110,15 @@ function AspirantePage() {
             })}
           </TabsList>
 
-          {FASES.map((f) => (
+          {fases.map((f) => (
             <TabsContent key={f.id} value={f.id} className="mt-4 space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <span className={cn("h-2.5 w-2.5 rounded-full", faseAccent[f.id].dot)} />
-                <h2 className="text-sm font-semibold">{f.titulo}</h2>
-                <span className="text-xs text-muted-foreground">· {f.totalPuntos} pts</span>
+              <div className="flex items-center justify-between gap-2 px-1">
+                <div className="flex items-center gap-2">
+                  <span className={cn("h-2.5 w-2.5 rounded-full", faseAccent[f.id].dot)} />
+                  <h2 className="text-sm font-semibold">{f.titulo}</h2>
+                  <span className="text-xs text-muted-foreground">· {f.totalPuntos} pts</span>
+                </div>
+                <CopiarEvaButton fase={f} evaluacion={evaluacion} />
               </div>
               {f.requisitos.map((req) => (
                 <RequisitoCard
