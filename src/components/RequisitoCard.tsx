@@ -64,6 +64,16 @@ export function RequisitoCard({ requisito, evaluacion, faseLabel, onChange }: Pr
           onChange={(patch) => onChange(patch)}
         />
       )}
+
+      {ev.updatedAt && ev.estado !== "pendiente" && (
+        <p className="mt-3 flex items-center gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          {ev.estado === "incompleto" ? "Marcado incompleto" : "Corregido"}
+          {ev.updatedByNombre ? ` por ${ev.updatedByNombre}` : ""}
+          {" · "}
+          {formatFecha(ev.updatedAt)}
+        </p>
+      )}
     </Card>
   );
 }
