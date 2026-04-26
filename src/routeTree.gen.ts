@@ -13,7 +13,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as ObservadorTokenRouteImport } from './routes/observador.$token'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/_admin'
 import { Route as AuthenticatedAspiranteIdRouteImport } from './routes/_authenticated/aspirante.$id'
+import { Route as AuthenticatedAdminAdminIndexRouteImport } from './routes/_authenticated/_admin/admin.index'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -34,11 +36,21 @@ const ObservadorTokenRoute = ObservadorTokenRouteImport.update({
   path: '/observador/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/_admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAspiranteIdRoute =
   AuthenticatedAspiranteIdRouteImport.update({
     id: '/aspirante/$id',
     path: '/aspirante/$id',
     getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminAdminIndexRoute =
+  AuthenticatedAdminAdminIndexRouteImport.update({
+    id: '/admin/',
+    path: '/admin/',
+    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -46,33 +58,44 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/observador/$token': typeof ObservadorTokenRoute
   '/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/admin/': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/observador/$token': typeof ObservadorTokenRoute
   '/': typeof AuthenticatedIndexRoute
+  '/observador/$token': typeof ObservadorTokenRoute
   '/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/admin': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
   '/observador/$token': typeof ObservadorTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/observador/$token' | '/aspirante/$id'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/observador/$token'
+    | '/aspirante/$id'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/observador/$token' | '/' | '/aspirante/$id'
+  to: '/login' | '/' | '/observador/$token' | '/aspirante/$id' | '/admin'
   id:
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/_admin'
     | '/observador/$token'
     | '/_authenticated/'
     | '/_authenticated/aspirante/$id'
+    | '/_authenticated/_admin/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -111,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ObservadorTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/_admin': {
+      id: '/_authenticated/_admin'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/aspirante/$id': {
       id: '/_authenticated/aspirante/$id'
       path: '/aspirante/$id'
@@ -118,15 +148,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAspiranteIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/_admin/admin/': {
+      id: '/_authenticated/_admin/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAdminIndexRoute: typeof AuthenticatedAdminAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAdminIndexRoute: AuthenticatedAdminAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
 interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAspiranteIdRoute: typeof AuthenticatedAspiranteIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAspiranteIdRoute: AuthenticatedAspiranteIdRoute,
 }
