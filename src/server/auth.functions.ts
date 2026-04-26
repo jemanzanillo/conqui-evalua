@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client.server";
 import { usuarios } from "@/db/schema";
 import { getSessionConfig, type SessionData } from "./session.server";
+import type { Rol } from "@/lib/storage";
 
 const signUpSchema = z.object({
   email: z.string().email().max(255).toLowerCase(),
@@ -38,13 +39,19 @@ export const signUp = createServerFn({ method: "POST" })
         email: data.email,
         passwordHash,
         nombre: data.nombre,
+        rol: "evaluador",
       })
-      .returning({ id: usuarios.id, email: usuarios.email, nombre: usuarios.nombre });
+      .returning({
+        id: usuarios.id,
+        email: usuarios.email,
+        nombre: usuarios.nombre,
+        rol: usuarios.rol,
+      });
 
     const session = await useSession<SessionData>(getSessionConfig());
     await session.update({ userId: user.id });
 
-    return { id: user.id, email: user.email, nombre: user.nombre };
+    return { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol as Rol };
   });
 
 export const signIn = createServerFn({ method: "POST" })
@@ -68,7 +75,12 @@ export const signIn = createServerFn({ method: "POST" })
     const session = await useSession<SessionData>(getSessionConfig());
     await session.update({ userId: user.id });
 
-    return { id: user.id, email: user.email, nombre: user.nombre };
+    return {
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      rol: (user.rol ?? "evaluador") as Rol,
+    };
   });
 
 export const signOut = createServerFn({ method: "POST" }).handler(async () => {
@@ -88,11 +100,13 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(
         id: usuarios.id,
         email: usuarios.email,
         nombre: usuarios.nombre,
+        rol: usuarios.rol,
       })
       .from(usuarios)
       .where(eq(usuarios.id, userId))
       .limit(1);
 
-    return user ?? null;
+    if (!user) return null;
+    return { ...user, rol: (user.rol ?? "evaluador") as Rol };
   },
 );
