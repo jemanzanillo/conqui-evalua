@@ -46,6 +46,13 @@ export function AspiranteCard({ aspirante, onRemove }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold">{aspirante.nombre}</p>
+            {(aspirante.zona || aspirante.club) && (
+              <p className="truncate text-[11px] text-muted-foreground">
+                {aspirante.zona ? `Zona ${aspirante.zona}` : ""}
+                {aspirante.zona && aspirante.club ? " · " : ""}
+                {aspirante.club ?? ""}
+              </p>
+            )}
             <div className="mt-1 flex flex-wrap gap-1.5">
               {FASES.map((f) => {
                 const { obtenidos, total } = puntajeFase(f, ev);

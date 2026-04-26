@@ -20,6 +20,9 @@ function toAspirante(row: typeof aspirantes.$inferSelect): Aspirante {
   return {
     id: row.id,
     nombre: row.nombre,
+    zona: row.zona,
+    club: row.club,
+    shareToken: row.shareToken,
     fechaCreacion: row.fechaCreacion.toISOString(),
   };
 }
@@ -52,13 +55,24 @@ export const getAspirante = createServerFn({ method: "GET" })
 
 export const addAspirante = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ nombre: z.string().trim().min(1).max(120) }).parse(input),
+    z
+      .object({
+        nombre: z.string().trim().min(1).max(120),
+        zona: z.number().int().min(1).max(11).nullable().optional(),
+        club: z.string().trim().max(120).nullable().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }): Promise<Aspirante> => {
     const userId = await requireUserId();
     const [row] = await db
       .insert(aspirantes)
-      .values({ ownerId: userId, nombre: data.nombre })
+      .values({
+        ownerId: userId,
+        nombre: data.nombre,
+        zona: data.zona ?? null,
+        club: data.club ?? null,
+      })
       .returning();
     return toAspirante(row);
   });
