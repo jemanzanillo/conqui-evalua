@@ -1,13 +1,14 @@
 import {
   createFileRoute,
   isRedirect,
+  Link,
   Outlet,
   redirect,
   useRouter,
 } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 import { getCurrentUser, signOut } from "@/server/auth.functions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -58,10 +59,17 @@ export function HeaderUserMenu() {
   if (!user) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <span className="hidden text-xs text-muted-foreground sm:inline">
         {user.nombre}
       </span>
+      {user.rol === "admin" && (
+        <Link to="/admin">
+          <Button variant="ghost" size="icon" aria-label="Panel admin">
+            <Shield className="h-4 w-4" />
+          </Button>
+        </Link>
+      )}
       <Button
         variant="ghost"
         size="icon"
