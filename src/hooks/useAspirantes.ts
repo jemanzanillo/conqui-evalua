@@ -8,6 +8,12 @@ import type { Aspirante } from "@/lib/storage";
 
 const KEY = ["aspirantes"] as const;
 
+export type NuevoAspiranteInput = {
+  nombre: string;
+  zona: number | null;
+  club: string | null;
+};
+
 export function useAspirantes() {
   const qc = useQueryClient();
   const query = useQuery<Aspirante[]>({
@@ -16,7 +22,7 @@ export function useAspirantes() {
   });
 
   const addMut = useMutation({
-    mutationFn: (nombre: string) => addAspirante({ data: { nombre } }),
+    mutationFn: (input: NuevoAspiranteInput) => addAspirante({ data: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 
@@ -28,7 +34,7 @@ export function useAspirantes() {
   return {
     aspirantes: query.data ?? [],
     isLoading: query.isLoading,
-    add: (nombre: string) => addMut.mutateAsync(nombre),
+    add: (input: NuevoAspiranteInput) => addMut.mutateAsync(input),
     remove: (id: string) => removeMut.mutateAsync(id),
   };
 }
