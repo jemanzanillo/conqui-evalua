@@ -19,39 +19,16 @@ const signInSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
+// El registro público está deshabilitado: la evaluación es un sistema cerrado
+// (Zona 5 GM 2026). Las cuentas de evaluador las crea el Coordinador desde el
+// panel de administración. Mantenemos la firma para no romper imports y
+// devolvemos un mensaje genérico que no revela el estado del correo.
 export const signUp = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => signUpSchema.parse(input))
-  .handler(async ({ data }) => {
-    const existing = await db
-      .select({ id: usuarios.id })
-      .from(usuarios)
-      .where(eq(usuarios.email, data.email))
-      .limit(1);
-
-    if (existing.length > 0) {
-      throw new Error("Ya existe una cuenta con ese correo.");
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-    const [user] = await db
-      .insert(usuarios)
-      .values({
-        email: data.email,
-        passwordHash,
-        nombre: data.nombre,
-        rol: "evaluador",
-      })
-      .returning({
-        id: usuarios.id,
-        email: usuarios.email,
-        nombre: usuarios.nombre,
-        rol: usuarios.rol,
-      });
-
-    const session = await useSession<SessionData>(getSessionConfig());
-    await session.update({ userId: user.id });
-
-    return { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol as Rol };
+  .handler(async (_ctx) => {
+    throw new Error(
+      "El registro está deshabilitado. Solicita una cuenta al Coordinador.",
+    );
   });
 
 export const signIn = createServerFn({ method: "POST" })
