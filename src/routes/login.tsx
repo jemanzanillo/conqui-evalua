@@ -1,5 +1,5 @@
 import { createFileRoute, isRedirect, redirect, useRouter } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,13 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const search = Route.useSearch();
 
-  const onSuccess = async () => {
+  const onSuccess = async (user: Awaited<ReturnType<typeof signIn>>) => {
+    queryClient.setQueryData(["currentUser"], user);
     await router.invalidate();
-    router.navigate({ to: search.redirect ?? "/" });
+    await router.navigate({ to: search.redirect ?? "/" });
   };
 
   return (
@@ -58,16 +60,20 @@ function LoginPage() {
   );
 }
 
-function SignInForm({ onSuccess }: { onSuccess: () => void }) {
+function SignInForm({
+  onSuccess,
+}: {
+  onSuccess: (user: Awaited<ReturnType<typeof signIn>>) => void | Promise<void>;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const mut = useMutation({
     mutationFn: () => signIn({ data: { email, password } }),
-    onSuccess: () => {
+    onSuccess: (user) => {
       setError(null);
-      onSuccess();
+      onSuccess(user);
     },
     onError: (e: Error) => setError(e.message),
   });
