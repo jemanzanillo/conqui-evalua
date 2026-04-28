@@ -187,3 +187,55 @@ export const listRequisitosOverridesPublic = createServerFn({
     evidencias: r.evidencias ?? null,
   }));
 });
+
+const createEvaluadorSchema = z.object({
+  nombre: z.string().trim().min(1).max(120),
+  email: z.string().email().max(255).toLowerCase(),
+  password: z.string().min(8).max(200),
+  rol: z.enum(["evaluador", "admin"]).default("evaluador"),
+});
+
+export const createEvaluador = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createEvaluadorSchema.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdminId();
+
+    const [existing] = await db
+      .select({ id: usuarios.id })
+      .from(usuarios)
+      .where(eq(usuarios.email, data.email))
+      .limit(1);
+    if (existing) {
+      throw new Error("Ya existe una cuenta con ese correo.");
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const [row] = await db
+      .insert(usuarios)
+      .values({
+        email: data.email,
+        passwordHash,
+        nombre: data.nombre,
+        rol: data.rol,
+      })
+      .returning({
+        id: usuarios.id,
+        email: usuarios.email,
+        nombre: usuarios.nombre,
+        rol: usuarios.rol,
+      });
+    return row;
+  });
+
+export const deleteUsuario = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const adminId = await requireAdminId();
+    if (data.id === adminId) {
+      throw new Error("No puedes eliminar tu propia cuenta.");
+    }
+    await db.delete(usuarios).where(eq(usuarios.id, data.id));
+    return { ok: true };
+  });
