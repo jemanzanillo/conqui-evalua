@@ -14,7 +14,23 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ArrowLeft, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { FASES } from "@/data/requisitos";
 import {
@@ -23,7 +39,10 @@ import {
   listAllAspirantes,
   listRequisitosOverrides,
   upsertRequisitoOverride,
+  createEvaluador,
+  deleteUsuario,
 } from "@/server/admin.functions";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { RequisitoOverride } from "@/lib/storage";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/")({
