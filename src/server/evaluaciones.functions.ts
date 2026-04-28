@@ -19,11 +19,11 @@ async function requireUserId(): Promise<string> {
   return userId;
 }
 
-async function assertOwnership(aspiranteId: string, userId: string) {
+async function assertAspiranteExists(aspiranteId: string) {
   const [row] = await db
     .select({ id: aspirantes.id })
     .from(aspirantes)
-    .where(and(eq(aspirantes.id, aspiranteId), eq(aspirantes.ownerId, userId)))
+    .where(eq(aspirantes.id, aspiranteId))
     .limit(1);
   if (!row) throw new Error("NOT_FOUND");
 }
@@ -35,8 +35,8 @@ export const getEvaluacion = createServerFn({ method: "GET" })
     z.object({ aspiranteId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }): Promise<EvaluacionAspirante> => {
-    const userId = await requireUserId();
-    await assertOwnership(data.aspiranteId, userId);
+    await requireUserId();
+    await assertAspiranteExists(data.aspiranteId);
 
     const rows = await db
       .select({
@@ -79,7 +79,7 @@ export const updateRequisito = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => updateSchema.parse(input))
   .handler(async ({ data }) => {
     const userId = await requireUserId();
-    await assertOwnership(data.aspiranteId, userId);
+    await assertAspiranteExists(data.aspiranteId);
 
     const now = new Date();
 
