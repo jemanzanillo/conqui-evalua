@@ -60,7 +60,11 @@ function LoginPage() {
   );
 }
 
-function SignInForm({ onSuccess }: { onSuccess: () => void }) {
+function SignInForm({
+  onSuccess,
+}: {
+  onSuccess: (user: Awaited<ReturnType<typeof signIn>>) => void | Promise<void>;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
