@@ -6,7 +6,7 @@ import {
   redirect,
   useRouter,
 } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { LogOut, Shield } from "lucide-react";
 import { getCurrentUser, signOut } from "@/server/auth.functions";
@@ -48,9 +48,13 @@ function AuthenticatedLayout() {
 export function HeaderUserMenu() {
   const { data: user } = useCurrentUser();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const mut = useMutation({
     mutationFn: () => signOut(),
     onSuccess: async () => {
+      queryClient.setQueryData(["currentUser"], null);
+      queryClient.removeQueries({ queryKey: ["currentUser"] });
+      queryClient.clear();
       await router.invalidate();
       router.navigate({ to: "/login" });
     },

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client.server";
 import { aspirantes } from "@/db/schema";
@@ -27,13 +27,13 @@ function toAspirante(row: typeof aspirantes.$inferSelect): Aspirante {
   };
 }
 
+// Pool compartido: todos los evaluadores autenticados ven todos los aspirantes.
 export const listAspirantes = createServerFn({ method: "GET" }).handler(
   async (): Promise<Aspirante[]> => {
-    const userId = await requireUserId();
+    await requireUserId();
     const rows = await db
       .select()
       .from(aspirantes)
-      .where(eq(aspirantes.ownerId, userId))
       .orderBy(asc(aspirantes.nombre));
     return rows.map(toAspirante);
   },
@@ -44,11 +44,11 @@ export const getAspirante = createServerFn({ method: "GET" })
     z.object({ id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }): Promise<Aspirante | null> => {
-    const userId = await requireUserId();
+    await requireUserId();
     const [row] = await db
       .select()
       .from(aspirantes)
-      .where(and(eq(aspirantes.id, data.id), eq(aspirantes.ownerId, userId)))
+      .where(eq(aspirantes.id, data.id))
       .limit(1);
     return row ? toAspirante(row) : null;
   });
@@ -82,9 +82,7 @@ export const removeAspirante = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
-    const userId = await requireUserId();
-    await db
-      .delete(aspirantes)
-      .where(and(eq(aspirantes.id, data.id), eq(aspirantes.ownerId, userId)));
+    await requireUserId();
+    await db.delete(aspirantes).where(eq(aspirantes.id, data.id));
     return { ok: true };
   });

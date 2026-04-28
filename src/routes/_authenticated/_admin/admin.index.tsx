@@ -14,7 +14,23 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ArrowLeft, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { FASES } from "@/data/requisitos";
 import {
@@ -23,7 +39,10 @@ import {
   listAllAspirantes,
   listRequisitosOverrides,
   upsertRequisitoOverride,
+  createEvaluador,
+  deleteUsuario,
 } from "@/server/admin.functions";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { RequisitoOverride } from "@/lib/storage";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/")({
@@ -70,44 +89,173 @@ function AdminPage() {
 }
 
 function UsuariosTab() {
+  const qc = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ["admin-usuarios"],
     queryFn: () => listUsuarios(),
   });
+
+  const [openNew, setOpenNew] = useState(false);
+  const [form, setForm] = useState({
+    nombre: "",
+    email: "",
+    password: "",
+    rol: "evaluador" as "evaluador" | "admin",
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => createEvaluador({ data: form }),
+    onSuccess: () => {
+      toast.success("Cuenta creada");
+      qc.invalidateQueries({ queryKey: ["admin-usuarios"] });
+      setOpenNew(false);
+      setForm({ nombre: "", email: "", password: "", rol: "evaluador" });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteUsuario({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Cuenta eliminada");
+      qc.invalidateQueries({ queryKey: ["admin-usuarios"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+
   return (
-    <Card className="overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2">Nombre</th>
-            <th className="px-3 py-2">Correo</th>
-            <th className="px-3 py-2">Rol</th>
-            <th className="px-3 py-2 text-right">Aspirantes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {usuarios.map((u) => (
-            <tr key={u.id} className="border-t">
-              <td className="px-3 py-2 font-medium">{u.nombre}</td>
-              <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
-              <td className="px-3 py-2">
-                <span
-                  className={
-                    u.rol === "admin"
-                      ? "rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary"
-                      : "rounded-full bg-muted px-2 py-0.5 text-xs"
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Dialog open={openNew} onOpenChange={setOpenNew}>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <Plus className="mr-1 h-4 w-4" />
+              Nuevo evaluador
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear cuenta</DialogTitle>
+              <DialogDescription>
+                El evaluador podrá iniciar sesión con este correo y contraseña.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Nombre</Label>
+                <Input
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Correo</Label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Contraseña (mín. 8)</Label>
+                <Input
+                  type="text"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Rol</Label>
+                <Select
+                  value={form.rol}
+                  onValueChange={(v) =>
+                    setForm({ ...form, rol: v as "evaluador" | "admin" })
                   }
                 >
-                  {u.rol}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums">{u.aspirantesCount}</td>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="evaluador">Evaluador</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setOpenNew(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => createMut.mutate()}
+                disabled={
+                  createMut.isPending ||
+                  !form.nombre ||
+                  !form.email ||
+                  form.password.length < 8
+                }
+              >
+                {createMut.isPending ? "Creando…" : "Crear"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2">Nombre</th>
+              <th className="px-3 py-2">Correo</th>
+              <th className="px-3 py-2">Rol</th>
+              <th className="px-3 py-2 text-right">Aspirantes</th>
+              <th className="px-3 py-2"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
+          </thead>
+          <tbody>
+            {usuarios.map((u) => (
+              <tr key={u.id} className="border-t">
+                <td className="px-3 py-2 font-medium">{u.nombre}</td>
+                <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
+                <td className="px-3 py-2">
+                  <span
+                    className={
+                      u.rol === "admin"
+                        ? "rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary"
+                        : "rounded-full bg-muted px-2 py-0.5 text-xs"
+                    }
+                  >
+                    {u.rol}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {u.aspirantesCount}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {currentUser?.id !== u.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm(`¿Eliminar la cuenta de ${u.nombre}?`))
+                          deleteMut.mutate(u.id);
+                      }}
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
   );
 }
 
