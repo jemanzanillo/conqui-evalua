@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
 import { desc, eq, sql as sqlOp } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/db/client.server";
 import {
