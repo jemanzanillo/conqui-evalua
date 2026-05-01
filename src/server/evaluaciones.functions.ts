@@ -3,7 +3,12 @@ import { useSession } from "@tanstack/react-start/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client.server";
-import { aspirantes, evaluaciones } from "@/db/schema";
+import {
+  aspirantes,
+  evaluaciones,
+  historialEvaluaciones,
+  usuarios,
+} from "@/db/schema";
 import { getSessionConfig, type SessionData } from "./session.server";
 import type { EvaluacionAspirante, EvaluacionRequisito } from "@/lib/storage";
 
@@ -14,11 +19,11 @@ async function requireUserId(): Promise<string> {
   return userId;
 }
 
-async function assertOwnership(aspiranteId: string, userId: string) {
+async function assertAspiranteExists(aspiranteId: string) {
   const [row] = await db
     .select({ id: aspirantes.id })
     .from(aspirantes)
-    .where(and(eq(aspirantes.id, aspiranteId), eq(aspirantes.ownerId, userId)))
+    .where(eq(aspirantes.id, aspiranteId))
     .limit(1);
   if (!row) throw new Error("NOT_FOUND");
 }
@@ -30,12 +35,21 @@ export const getEvaluacion = createServerFn({ method: "GET" })
     z.object({ aspiranteId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }): Promise<EvaluacionAspirante> => {
-    const userId = await requireUserId();
-    await assertOwnership(data.aspiranteId, userId);
+    await requireUserId();
+    await assertAspiranteExists(data.aspiranteId);
 
     const rows = await db
-      .select()
+      .select({
+        requisitoId: evaluaciones.requisitoId,
+        estado: evaluaciones.estado,
+        seleccionados: evaluaciones.seleccionados,
+        motivo: evaluaciones.motivo,
+        comentario: evaluaciones.comentario,
+        updatedAt: evaluaciones.updatedAt,
+        updatedByNombre: usuarios.nombre,
+      })
       .from(evaluaciones)
+      .leftJoin(usuarios, eq(evaluaciones.updatedBy, usuarios.id))
       .where(eq(evaluaciones.aspiranteId, data.aspiranteId));
 
     const out: EvaluacionAspirante = {};
@@ -45,6 +59,8 @@ export const getEvaluacion = createServerFn({ method: "GET" })
         seleccionados: r.seleccionados ?? [],
         motivo: r.motivo ?? undefined,
         comentario: r.comentario ?? undefined,
+        updatedAt: r.updatedAt.toISOString(),
+        updatedByNombre: r.updatedByNombre,
       };
     }
     return out;
@@ -63,7 +79,9 @@ export const updateRequisito = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => updateSchema.parse(input))
   .handler(async ({ data }) => {
     const userId = await requireUserId();
-    await assertOwnership(data.aspiranteId, userId);
+    await assertAspiranteExists(data.aspiranteId);
+
+    const now = new Date();
 
     const insertValues = {
       aspiranteId: data.aspiranteId,
@@ -72,10 +90,14 @@ export const updateRequisito = createServerFn({ method: "POST" })
       seleccionados: data.seleccionados ?? [],
       motivo: data.motivo ?? null,
       comentario: data.comentario ?? null,
-      updatedAt: new Date(),
+      updatedBy: userId,
+      updatedAt: now,
     };
 
-    const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+    const updateSet: Record<string, unknown> = {
+      updatedAt: now,
+      updatedBy: userId,
+    };
     if (data.estado !== undefined) updateSet.estado = data.estado;
     if (data.seleccionados !== undefined)
       updateSet.seleccionados = data.seleccionados;
@@ -89,6 +111,30 @@ export const updateRequisito = createServerFn({ method: "POST" })
         target: [evaluaciones.aspiranteId, evaluaciones.requisitoId],
         set: updateSet,
       });
+
+    // Leer estado actual final para registrarlo en historial
+    const [current] = await db
+      .select()
+      .from(evaluaciones)
+      .where(
+        and(
+          eq(evaluaciones.aspiranteId, data.aspiranteId),
+          eq(evaluaciones.requisitoId, data.requisitoId),
+        ),
+      )
+      .limit(1);
+
+    if (current) {
+      await db.insert(historialEvaluaciones).values({
+        aspiranteId: data.aspiranteId,
+        requisitoId: data.requisitoId,
+        evaluadorId: userId,
+        estado: current.estado,
+        seleccionados: current.seleccionados ?? [],
+        motivo: current.motivo,
+        comentario: current.comentario,
+      });
+    }
 
     return { ok: true };
   });

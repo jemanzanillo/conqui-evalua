@@ -5,15 +5,17 @@ import type { Requisito } from "@/data/requisitos";
 import type { EvaluacionRequisito } from "@/lib/storage";
 import { isCompletado } from "@/lib/scoring";
 import { IncompletoForm } from "./IncompletoForm";
-import { Check, Circle, X } from "lucide-react";
+import { RequisitoGuiaSheet } from "./RequisitoGuiaSheet";
+import { Check, Circle, Clock, X } from "lucide-react";
 
 type Props = {
   requisito: Requisito;
   evaluacion?: EvaluacionRequisito;
+  faseLabel: string;
   onChange: (patch: Partial<EvaluacionRequisito>) => void;
 };
 
-export function RequisitoCard({ requisito, evaluacion, onChange }: Props) {
+export function RequisitoCard({ requisito, evaluacion, faseLabel, onChange }: Props) {
   const ev = evaluacion ?? { estado: "pendiente" as const };
   const completado = isCompletado(requisito, ev);
   const incompleto = ev.estado === "incompleto";
@@ -26,11 +28,14 @@ export function RequisitoCard({ requisito, evaluacion, onChange }: Props) {
         incompleto && "border-destructive/50 bg-destructive/5",
       )}
     >
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold leading-snug">{requisito.titulo}</h3>
-        {requisito.descripcion && (
-          <p className="mt-1 text-xs text-muted-foreground">{requisito.descripcion}</p>
-        )}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold leading-snug">{requisito.titulo}</h3>
+          {requisito.descripcion && (
+            <p className="mt-1 text-xs text-muted-foreground">{requisito.descripcion}</p>
+          )}
+        </div>
+        <RequisitoGuiaSheet requisito={requisito} faseLabel={faseLabel} />
       </div>
 
       {requisito.tipo === "simple" ? (
@@ -58,6 +63,16 @@ export function RequisitoCard({ requisito, evaluacion, onChange }: Props) {
           comentario={ev.comentario}
           onChange={(patch) => onChange(patch)}
         />
+      )}
+
+      {ev.updatedAt && ev.estado !== "pendiente" && (
+        <p className="mt-3 flex items-center gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          {ev.estado === "incompleto" ? "Marcado incompleto" : "Corregido"}
+          {ev.updatedByNombre ? ` por ${ev.updatedByNombre}` : ""}
+          {" · "}
+          {formatFecha(ev.updatedAt)}
+        </p>
       )}
     </Card>
   );
@@ -155,4 +170,18 @@ function SeleccionList({
       </div>
     </div>
   );
+}
+
+function formatFecha(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }

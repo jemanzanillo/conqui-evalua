@@ -1,51 +1,62 @@
-## Diagnóstico
+# Plan de mejoras
 
-He revisado el sitio publicado (`gm-evalua.lovable.app`) y hay **tres problemas** combinados:
+## 1) Aspirantes compartidos entre todos los evaluadores
 
-1. **El sitio publicado no tiene `DATABASE_URL` ni `SESSION_SECRET`.** Tu `.env` local solo funciona en tu máquina. Lovable no lee `.env` para el sitio publicado — necesita los valores como **secrets** de runtime. Por eso `getCurrentUser` devuelve **HTTP 500** y la web crashea antes de mostrar nada útil.
-2. **La base de datos Neon está vacía.** Conecté con tu connection string y `\dt` devuelve "Did not find any relations". Las tablas `usuarios`, `aspirantes`, `evaluaciones` nunca se crearon. Aunque el sitio tuviera la URL configurada, signup fallaría.
-3. **Ruta `/signup` huérfana.** Existe `src/routes/signup.tsx` con un formulario antiguo que no encaja con el flujo actual (login.tsx ya tiene tabs Entrar / Crear cuenta). Sospecho que es la "página de registro" que viste cargar en blanco o con error. Hay que eliminarla.
+Hoy cada evaluador solo ve los aspirantes que él mismo creó (filtrado por `ownerId`). Vamos a convertirlo en un **pool compartido**: cualquier evaluador (y el admin) ve todos los aspirantes y puede evaluarlos. El campo `ownerId` se mantiene solo como "creado por" para auditoría.
 
----
+**Cambios server (`src/server/aspirantes.functions.ts`):**
+- `listAspirantes`: quitar el `where(eq(ownerId, userId))`. Devolver todos los aspirantes ordenados por nombre. Solo exigir sesión válida.
+- `getAspirante`: quitar el filtro por `ownerId`, solo buscar por `id`.
+- `removeAspirante`: permitir eliminar a cualquier evaluador autenticado (mismo criterio que la app: equipo de confianza). El admin obviamente también puede.
+- `addAspirante`: sin cambios (sigue guardando `ownerId = sesión actual`).
 
-## Lo que voy a hacer (en modo build)
+**Cambios server (`src/server/evaluaciones.functions.ts`):**
+- Reemplazar `assertOwnership` por `assertAspiranteExists` (solo verifica que el aspirante exista). Tanto `getEvaluacion` como `updateRequisito` lo usan.
+- `updatedBy` y el historial siguen registrando al evaluador real que hizo el cambio, así sabes quién corrigió qué (ya estaba implementado).
 
-### 1. Crear las tablas en Neon
-Ejecutar el SQL de `src/db/migrations/0001_init.sql` contra tu Neon usando la `DATABASE_URL` del `.env`. Esto crea `usuarios`, `aspirantes`, `evaluaciones`, índices y la extensión `pgcrypto`. Verificaré con `\dt` que las tres tablas aparecen.
+**Sin migración de base de datos**: la columna `owner_id` se queda como metadato de "creador".
 
-### 2. Configurar los secrets en Lovable
-Añadir como **runtime secrets** (los lee `process.env` en el servidor publicado):
-- `DATABASE_URL` → la cadena de Neon que ya tienes en `.env`
-- `SESSION_SECRET` → la clave de 32+ chars que ya tienes en `.env`
+## 2) Cerrar sesión (no funciona)
 
-Te pediré confirmación con `add_secret` antes de guardar nada — los valores los pegas tú o me autorizas a usar los del `.env`.
+El bug: `signOut` borra la cookie del lado servidor, pero la query `["currentUser"]` de TanStack Query queda cacheada con `staleTime: 5min`. Al hacer `router.invalidate()`, el `beforeLoad` de `_authenticated` vuelve a usar `ensureQueryData` que devuelve el usuario cacheado → no redirige a `/login`.
 
-### 3. Eliminar la ruta `/signup` huérfana
-Borrar `src/routes/signup.tsx`. El registro vive en `/login` (pestaña "Crear cuenta") y funciona contra el server function `signUp` ya implementado.
+**Fix en `src/routes/_authenticated.tsx` (`HeaderUserMenu`):**
+- En `onSuccess` del mutation de `signOut`:
+  1. `queryClient.removeQueries({ queryKey: ["currentUser"] })` (o `setQueryData(["currentUser"], null)`).
+  2. `await router.invalidate()`.
+  3. `router.navigate({ to: "/login" })`.
+- Importar `useQueryClient` desde `@tanstack/react-query`.
 
-### 4. Endurecer manejo de errores
-- En `_authenticated.tsx`: si `getCurrentUser` lanza (caso actual: BD no responde), redirigir a `/login` en vez de mostrar el error global. Así nunca vuelves a ver pantalla rota — siempre acabas en login.
-- En `login.tsx` (tab Crear cuenta): mostrar mensaje claro si el server devuelve 500 ("Servicio no disponible, contacta al administrador") en vez de un error técnico.
+## 3) Crear cuentas de evaluador desde el panel del Coordinador
 
-### 5. Verificación end-to-end
-Después de aplicar todo:
-- Llamar `getCurrentUser` en producción → debe devolver `null` (200), no 500.
-- Crear una cuenta de prueba desde la UI y confirmar que entra al dashboard.
-- Borrar el usuario de prueba con SQL si quieres dejar la BD limpia.
+Nueva sección dentro de `/admin` para que el Coordinador cree, vea y elimine cuentas sin tocar la BD.
 
----
+**Server (`src/server/admin.functions.ts`):**
+- Nueva server function `createEvaluador({ nombre, email, password, rol })`:
+  - Solo admin (`requireAdminId`).
+  - Valida con Zod: email válido, password ≥ 8, nombre 1–120, rol `'evaluador' | 'admin'` (default `'evaluador'`).
+  - Hashea con `bcryptjs` (ya está instalado, lo usa `auth.functions.ts`).
+  - Inserta en `usuarios`. Si el email ya existe, devuelve error claro.
+- Nueva server function `deleteUsuario({ id })`:
+  - Solo admin. Bloquear si `id === adminId` (no auto-eliminarse).
+  - `delete from usuarios where id = ...` (cascada borra sus aspirantes; sus historiales mantienen `evaluador_id` con `set null`).
 
-## Notas técnicas (puedes saltarlas)
+**UI (`src/routes/_authenticated/_admin/admin.index.tsx`):**
+- En la pestaña "Usuarios" agregar un botón **"Nuevo evaluador"** que abre un Dialog con campos: nombre, correo, contraseña, rol (select evaluador/admin).
+- Cada fila de la tabla de usuarios obtiene un botón de eliminar (icono trash) con `confirm()`. Oculto para la fila del propio admin.
+- Al crear/eliminar: invalidar `["admin-usuarios"]` y mostrar toast.
 
-- Los `runtime secrets` de Lovable se inyectan en el Worker SSR como `process.env.X`, igual que en Vercel. Esto es lo equivalente a "Environment Variables" en Vercel.
-- Tu `.env` local lo siguen usando `vite dev` y `psql`/`drizzle-kit`, así que no se borra.
-- La cookie de sesión usa `SESSION_SECRET` para encriptar. Si lo cambias después, todas las sesiones existentes se invalidan (en este caso no hay ninguna todavía, así que da igual).
-- Sigues teniendo la opción de migrar a Vercel cuando quieras — el código ya es portable. Pero si Lovable Publish te basta, esto te resuelve hoy mismo sin tocar Vercel.
+## Detalles técnicos
 
----
+```text
+src/
+├── server/
+│   ├── aspirantes.functions.ts   (quitar filtros por ownerId)
+│   ├── evaluaciones.functions.ts (assertOwnership → assertAspiranteExists)
+│   └── admin.functions.ts        (+ createEvaluador, deleteUsuario)
+└── routes/
+    ├── _authenticated.tsx                       (fix logout: limpiar cache currentUser)
+    └── _authenticated/_admin/admin.index.tsx    (UI nuevo evaluador + borrar)
+```
 
-## Lo que NO hago en esta tanda (avísame si lo quieres)
-
-- Migrar el deploy a Vercel (sigue siendo posible, pero arreglar el publish actual es más rápido).
-- Recuperación de contraseña por email (requiere conector tipo Resend).
-- Botón "Exportar/Importar JSON" para datos antiguos del localStorage.
+No se crean tablas ni migraciones nuevas. No se cambia el flujo de login. La cuenta hardcoded "Coordinador" sigue funcionando igual.

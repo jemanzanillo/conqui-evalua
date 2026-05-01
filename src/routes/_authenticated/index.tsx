@@ -31,7 +31,7 @@ function Dashboard() {
               <p className="text-xs text-muted-foreground">Hoja de cotejo Z5 2026</p>
             </div>
             <div className="flex items-center gap-2">
-              <NuevoAspiranteDialog onCreate={(n) => add(n)} />
+              <NuevoAspiranteDialog onCreate={(input) => add(input)} />
               <HeaderUserMenu />
             </div>
           </div>
