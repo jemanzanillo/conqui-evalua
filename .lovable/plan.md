@@ -1,62 +1,64 @@
-# Plan de mejoras
+# Plan: Add `README.md` for the repository
 
-## 1) Aspirantes compartidos entre todos los evaluadores
+Create a single new file `README.md` at the repository root. Nothing else changes.
 
-Hoy cada evaluador solo ve los aspirantes que él mismo creó (filtrado por `ownerId`). Vamos a convertirlo en un **pool compartido**: cualquier evaluador (y el admin) ve todos los aspirantes y puede evaluarlos. El campo `ownerId` se mantiene solo como "creado por" para auditoría.
+## Goals
 
-**Cambios server (`src/server/aspirantes.functions.ts`):**
-- `listAspirantes`: quitar el `where(eq(ownerId, userId))`. Devolver todos los aspirantes ordenados por nombre. Solo exigir sesión válida.
-- `getAspirante`: quitar el filtro por `ownerId`, solo buscar por `id`.
-- `removeAspirante`: permitir eliminar a cualquier evaluador autenticado (mismo criterio que la app: equipo de confianza). El admin obviamente también puede.
-- `addAspirante`: sin cambios (sigue guardando `ownerId = sesión actual`).
+- Give anyone landing on the repo a clear picture of what the app is, who it's for, and how to run it.
+- Document the tech stack, project structure, environment variables, and deploy path (Vercel + Neon, already covered in `DEPLOY.md`).
+- Capture the domain rules that already live in `contexto.txt` (3 evaluation phases, scoring, roles).
 
-**Cambios server (`src/server/evaluaciones.functions.ts`):**
-- Reemplazar `assertOwnership` por `assertAspiranteExists` (solo verifica que el aspirante exista). Tanto `getEvaluacion` como `updateRequisito` lo usan.
-- `updatedBy` y el historial siguen registrando al evaluador real que hizo el cambio, así sabes quién corrigió qué (ya estaba implementado).
+## Proposed sections
 
-**Sin migración de base de datos**: la columna `owner_id` se queda como metadato de "creador".
+1. **Title & one-line pitch** — "Evaluación Guías Mayores: web app móvil-first para evaluar aspirantes a Guías Mayores en sesiones presenciales."
+2. **Contexto** — short summary of the project's purpose (digitalizar el Excel de evaluación, Zona 5 GM 2026).
+3. **Características principales**
+   - Pool compartido de aspirantes entre todos los evaluadores.
+   - 3 fases de evaluación (EVA-1 12 pts, EVA-2 15 pts, EVA-3 11 pts) con tarjetas de requisitos, sub-checkboxes para requisitos "X de Y", y formulario de Incompleto con motivo + comentario.
+   - Semáforo de puntaje en vivo (rojo / amarillo / verde) en sticky footer basado en EVA-1.
+   - Roles: `evaluador` y `admin` (Coordinador). Admin puede crear/eliminar evaluadores y editar overrides de requisitos desde `/admin`.
+   - Vista de "observador" pública por token (`/observador/:token`) para compartir el progreso de un aspirante.
+   - Historial completo por requisito (quién corrigió qué y cuándo).
+4. **Tech stack**
+   - TanStack Start v1 (React 19, Vite 7, SSR, server functions).
+   - TanStack Router (file-based) + TanStack Query.
+   - Tailwind CSS v4 + shadcn/ui (Radix primitives).
+   - Drizzle ORM sobre Neon Postgres (`@neondatabase/serverless`).
+   - Auth propia con `bcryptjs` + sesión cifrada en cookie httpOnly.
+   - Despliegue: Cloudflare Workers (preview Lovable) o Vercel (producción).
+5. **Estructura del proyecto** — árbol resumido:
+   ```text
+   src/
+     routes/                rutas file-based (incluye _authenticated, _admin, observador)
+     components/            UI (AspiranteCard, RequisitoCard, ScoreFooter, ...)
+     server/                server functions (auth, aspirantes, evaluaciones, admin, observador)
+     db/                    schema Drizzle + migraciones SQL
+     data/requisitos.ts     definición de las 3 fases y requisitos
+     hooks/, lib/           hooks de datos y utilidades (scoring, storage)
+   scripts/                 utilidades one-off (reset de coordinador)
+   ```
+6. **Requisitos previos** — Bun (o npm), Node 20+, una base Neon Postgres.
+7. **Setup local**
+   - `bun install`
+   - copiar `.env.example` → `.env` con `DATABASE_URL` y `SESSION_SECRET` (generar con `openssl rand -base64 48`).
+   - aplicar esquema: `psql $DATABASE_URL -f src/db/migrations/0001_init.sql && psql $DATABASE_URL -f src/db/migrations/0002_admin_y_extras.sql` (o `bunx drizzle-kit push`).
+   - `bun run dev` → http://localhost:3000.
+8. **Variables de entorno**
+   | Nombre | Descripción |
+   |---|---|
+   | `DATABASE_URL` | Cadena Postgres de Neon (`postgresql://...?sslmode=require`). |
+   | `SESSION_SECRET` | Secreto ≥ 32 chars para firmar la cookie de sesión. |
+9. **Cuentas y roles**
+   - El registro público está deshabilitado.
+   - El Coordinador (`admin`) crea cuentas de evaluador desde `/admin → Usuarios → Nuevo evaluador`.
+   - Hay un script `scripts/reset-coordinador.ts` para resetear la contraseña del coordinador inicial.
+10. **Scripts NPM** — `dev`, `build`, `build:dev`, `preview`, `lint`, `format`.
+11. **Despliegue** — referencia corta a `DEPLOY.md` (Vercel + Neon, dominio propio, variables).
+12. **Modelo de datos** — tabla resumen: `usuarios`, `aspirantes`, `evaluaciones`, `historial_evaluaciones`, `requisitos_overrides`. Una línea por tabla.
+13. **Licencia / créditos** — uso interno Zona 5 GM 2026; sin licencia pública declarada.
 
-## 2) Cerrar sesión (no funciona)
+## Notas
 
-El bug: `signOut` borra la cookie del lado servidor, pero la query `["currentUser"]` de TanStack Query queda cacheada con `staleTime: 5min`. Al hacer `router.invalidate()`, el `beforeLoad` de `_authenticated` vuelve a usar `ensureQueryData` que devuelve el usuario cacheado → no redirige a `/login`.
-
-**Fix en `src/routes/_authenticated.tsx` (`HeaderUserMenu`):**
-- En `onSuccess` del mutation de `signOut`:
-  1. `queryClient.removeQueries({ queryKey: ["currentUser"] })` (o `setQueryData(["currentUser"], null)`).
-  2. `await router.invalidate()`.
-  3. `router.navigate({ to: "/login" })`.
-- Importar `useQueryClient` desde `@tanstack/react-query`.
-
-## 3) Crear cuentas de evaluador desde el panel del Coordinador
-
-Nueva sección dentro de `/admin` para que el Coordinador cree, vea y elimine cuentas sin tocar la BD.
-
-**Server (`src/server/admin.functions.ts`):**
-- Nueva server function `createEvaluador({ nombre, email, password, rol })`:
-  - Solo admin (`requireAdminId`).
-  - Valida con Zod: email válido, password ≥ 8, nombre 1–120, rol `'evaluador' | 'admin'` (default `'evaluador'`).
-  - Hashea con `bcryptjs` (ya está instalado, lo usa `auth.functions.ts`).
-  - Inserta en `usuarios`. Si el email ya existe, devuelve error claro.
-- Nueva server function `deleteUsuario({ id })`:
-  - Solo admin. Bloquear si `id === adminId` (no auto-eliminarse).
-  - `delete from usuarios where id = ...` (cascada borra sus aspirantes; sus historiales mantienen `evaluador_id` con `set null`).
-
-**UI (`src/routes/_authenticated/_admin/admin.index.tsx`):**
-- En la pestaña "Usuarios" agregar un botón **"Nuevo evaluador"** que abre un Dialog con campos: nombre, correo, contraseña, rol (select evaluador/admin).
-- Cada fila de la tabla de usuarios obtiene un botón de eliminar (icono trash) con `confirm()`. Oculto para la fila del propio admin.
-- Al crear/eliminar: invalidar `["admin-usuarios"]` y mostrar toast.
-
-## Detalles técnicos
-
-```text
-src/
-├── server/
-│   ├── aspirantes.functions.ts   (quitar filtros por ownerId)
-│   ├── evaluaciones.functions.ts (assertOwnership → assertAspiranteExists)
-│   └── admin.functions.ts        (+ createEvaluador, deleteUsuario)
-└── routes/
-    ├── _authenticated.tsx                       (fix logout: limpiar cache currentUser)
-    └── _authenticated/_admin/admin.index.tsx    (UI nuevo evaluador + borrar)
-```
-
-No se crean tablas ni migraciones nuevas. No se cambia el flujo de login. La cuenta hardcoded "Coordinador" sigue funcionando igual.
+- No tocar código de la app, solo añadir `README.md`.
+- Reusar texto literal de `contexto.txt` y `DEPLOY.md` donde aplique para no duplicar definiciones.
+- Mantener el README en español (el resto del proyecto y la UI están en español).
