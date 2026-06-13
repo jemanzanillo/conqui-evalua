@@ -64,9 +64,7 @@ export function HeaderUserMenu() {
 
   return (
     <div className="flex items-center gap-1">
-      <span className="hidden text-xs text-muted-foreground sm:inline">
-        {user.nombre}
-      </span>
+      <span className="hidden text-xs text-muted-foreground sm:inline">{user.nombre}</span>
       {user.rol === "admin" && (
         <Link to="/admin">
           <Button variant="ghost" size="icon" aria-label="Panel admin">

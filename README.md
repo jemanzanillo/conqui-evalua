@@ -1,27 +1,34 @@
-# Evaluación Guías Mayores
+# Concurso de Predicación — Conqui Evalúa
 
-Web app móvil-first para evaluar de forma presencial a aspirantes a Guías Mayores. Reemplaza el Excel y las hojas de cotejo en papel con un flujo digital que muestra puntaje en vivo, registra evidencias y mantiene un historial completo por requisito.
+Web app móvil-first para que un panel de jueces califique en vivo un concurso de predicación de
+Conquistadores. Reemplaza las hojas de calificación en papel con un flujo digital que muestra el
+puntaje en vivo, bloquea calificaciones ya enviadas y publica un ranking en tiempo real.
 
-> Uso interno **Zona 5 GM 2026**.
-
-- Preview: <https://id-preview--25e26c2c-e1b4-49bb-888e-4bf05cadc172.lovable.app>
-- Producción: <https://gm-evalua.lovable.app>
+> Variación de [gm-evalua](https://github.com/jemanzanillo/gm-evalua), reutilizando su base
+> técnica para un caso de uso distinto.
 
 ---
 
 ## Características
 
-- **Pool compartido de aspirantes**: cualquier evaluador autenticado ve y evalúa a cualquier aspirante. El campo "creado por" se conserva como auditoría.
-- **3 fases de evaluación** definidas en `src/data/requisitos.ts`:
-  - **EVA-1** — 12 pts (documentación, talleres, lecturas iniciales).
-  - **EVA-2** — 15 pts (seminarios, especialidades obligatorias y opcionales, primeros auxilios).
-  - **EVA-3** — 11 pts (servicio, enseñanza, especialidades de liderazgo, carpeta final).
-- **Tarjetas de requisito** con estados Pendiente / Completado / Incompleto. Los requisitos del tipo "X de Y" muestran sub-checkboxes y se marcan completados automáticamente al alcanzar el mínimo.
-- **Flujo de Incompleto** in-place: motivo de fallo (falta firma, contenido insuficiente, no cumple formato, …) + comentario libre.
-- **Semáforo de puntaje en vivo** en sticky footer basado en EVA-1: 🔴 0–5, 🟡 6–8, 🟢 9–12.
-- **Roles**: `evaluador` y `admin` (Coordinador). El admin gestiona usuarios y edita overrides de requisitos desde `/admin`.
-- **Vista pública de observador** por token: `/observador/:token` permite compartir el progreso de un aspirante sin login.
-- **Historial completo** por requisito: quién corrigió qué y cuándo (`historial_evaluaciones`).
+- **Evento único**: no hay fases. Cada participante da un sermón y es calificado por todos los
+  jueces conectados.
+- **6 criterios de calificación** definidos en `src/data/criterios.ts`, total 100 pts por juez:
+  - Mensaje y contenido — 25 pts
+  - Aplicación — 15 pts
+  - Dominio y manejo del tema — 30 pts
+  - Originalidad del tema — 10 pts
+  - Tiempo (6–8 min) — 10 pts
+  - Participación — 10 pts
+- **Sliders** de 0 al máximo por criterio, con un sticky footer que muestra el total en vivo (0-100).
+- **Envío y bloqueo**: al enviar su calificación, el juez ya no puede editarla. El Coordinador
+  puede reabrirla desde el panel de administración si hace falta corregir algo.
+- **Privacidad entre jueces**: cada juez solo ve su propia calificación por participante
+  (pendiente/enviada), nunca la de otros jueces ni el acumulado.
+- **Roles**: `juez` y `admin` (Coordinador). El admin gestiona cuentas de jueces, participantes,
+  reaperturas y el historial de envíos.
+- **Resultados públicos en vivo** (`/resultados`, sin login): ranking por puntaje total (suma de
+  todos los jueces que ya enviaron), con detalle expandible por criterio.
 
 ---
 
@@ -32,7 +39,7 @@ Web app móvil-first para evaluar de forma presencial a aspirantes a Guías Mayo
 - **Tailwind CSS v4** + **shadcn/ui** (Radix primitives).
 - **Drizzle ORM** sobre **Neon Postgres** (`@neondatabase/serverless`).
 - Auth propia con `bcryptjs` y sesión cifrada en cookie `httpOnly`.
-- Despliegue: Cloudflare Workers (preview Lovable) o Vercel (producción).
+- Despliegue: Cloudflare Workers (preview Lovable) o Vercel (producción) — ver `DEPLOY.md`.
 
 ---
 
@@ -40,13 +47,12 @@ Web app móvil-first para evaluar de forma presencial a aspirantes a Guías Mayo
 
 ```text
 src/
-  routes/                rutas file-based (incluye _authenticated, _admin, observador)
-  components/            UI (AspiranteCard, RequisitoCard, ScoreFooter, ...)
-  server/                server functions (auth, aspirantes, evaluaciones, admin, observador)
+  routes/                rutas file-based (incluye _authenticated, _admin, resultados público)
+  components/            UI (ParticipanteCard, CriterioCard, PuntajeFooter, ...)
+  server/                server functions (auth, participantes, calificaciones, admin, resultados)
   db/                    schema Drizzle + migraciones SQL
-  data/requisitos.ts     definición de las 3 fases y sus requisitos
+  data/criterios.ts      los 6 criterios del concurso y sus puntajes máximos
   hooks/, lib/           hooks de datos y utilidades (scoring, storage)
-scripts/                 utilidades one-off (p. ej. reset de coordinador)
 ```
 
 ---
@@ -65,82 +71,50 @@ scripts/                 utilidades one-off (p. ej. reset de coordinador)
 # 1. Instalar dependencias
 bun install
 
-# 2. Variables de entorno
-cp .env.example .env   # crea el archivo si no existe
-# Edita .env y completa DATABASE_URL y SESSION_SECRET
-#   SESSION_SECRET: openssl rand -base64 48
+# 2. Configurar variables de entorno
+cp .env.example .env
+# Edita .env: DATABASE_URL (Neon) y SESSION_SECRET (openssl rand -base64 48)
 
-# 3. Aplicar el esquema a la BD
-psql "$DATABASE_URL" -f src/db/migrations/0001_init.sql
-psql "$DATABASE_URL" -f src/db/migrations/0002_admin_y_extras.sql
-# (alternativa) bunx drizzle-kit push
+# 3. Aplicar el esquema
+psql $DATABASE_URL -f src/db/migrations/0001_init.sql
+# (o: bunx drizzle-kit push)
 
-# 4. Levantar el dev server
-bun run dev
+# 4. Crear la primera cuenta admin (Coordinador)
+DATABASE_URL=$DATABASE_URL bun scripts/create-admin.ts coordinador@ejemplo.com "Mi Nombre" "ClaveSegura123"
+
+# 5. Iniciar
+bun run dev   # http://localhost:3000
 ```
 
-La app queda en <http://localhost:3000>.
+Desde `/admin` (con la cuenta del Coordinador) puedes crear las cuentas de los jueces.
 
-### Variables de entorno
-
-| Nombre            | Descripción                                                              |
-| ----------------- | ------------------------------------------------------------------------ |
-| `DATABASE_URL`    | Cadena Postgres de Neon (`postgresql://user:pass@host/db?sslmode=require`). |
-| `SESSION_SECRET`  | Secreto ≥ 32 caracteres usado para firmar la cookie de sesión.           |
-
----
-
-## Cuentas y roles
-
-- El **registro público está deshabilitado**: el sistema es cerrado.
-- El Coordinador (rol `admin`) crea cuentas de evaluador desde **`/admin → Usuarios → Nuevo evaluador`**.
-- Para inicializar el primer admin, inserta una fila manual en `usuarios` con `rol = 'admin'` y un hash bcrypt, o usa el utilitario `scripts/reset-coordinador.ts` para resetear la contraseña del coordinador inicial:
-
-  ```bash
-  bun scripts/reset-coordinador.ts
-  ```
-
----
-
-## Scripts NPM
-
-| Comando            | Acción                              |
-| ------------------ | ----------------------------------- |
-| `bun run dev`      | Dev server con HMR.                 |
-| `bun run build`    | Build de producción.                |
-| `bun run build:dev`| Build en modo development.          |
-| `bun run preview`  | Sirve el build local.               |
-| `bun run lint`     | ESLint sobre todo el repo.          |
-| `bun run format`   | Prettier `--write`.                 |
-
----
-
-## Despliegue
-
-Guía completa en [`DEPLOY.md`](./DEPLOY.md). Resumen:
-
-1. Crear base en Neon y copiar `DATABASE_URL`.
-2. Importar el repo en Vercel (Framework: *Other*; Build: `bun run build`).
-3. Configurar `DATABASE_URL` y `SESSION_SECRET` en *Environment Variables*.
-4. Aplicar migraciones (`psql … -f src/db/migrations/*.sql` o `drizzle-kit push`).
-5. Conectar dominio en *Settings → Domains*.
+Para producción, ver `DEPLOY.md` (Vercel + Neon).
 
 ---
 
 ## Modelo de datos
 
-| Tabla                    | Propósito                                                                |
-| ------------------------ | ------------------------------------------------------------------------ |
-| `usuarios`               | Cuentas (`evaluador` / `admin`) con hash bcrypt.                         |
-| `aspirantes`             | Aspirantes evaluados (con `zona`, `club` y `share_token` público).       |
-| `evaluaciones`           | Estado actual de cada requisito por aspirante (último resultado).        |
-| `historial_evaluaciones` | Bitácora completa de cada cambio de estado, con autor y timestamp.       |
-| `requisitos_overrides`   | Ediciones del admin sobre el catálogo base de requisitos del manual.     |
+| Tabla                      | Propósito                                                                 |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `usuarios`                 | Cuentas (`juez` / `admin`) con hash bcrypt.                                |
+| `participantes`            | Participantes del concurso (nombre, club, zona, orden de presentación).   |
+| `calificaciones`           | Calificación actual de cada juez por participante (puntos por criterio, estado, fecha de envío). |
+| `historial_calificaciones` | Bitácora de envíos y reaperturas, con autor y timestamp.                   |
 
-Las definiciones viven en `src/db/schema.ts` y los SQL iniciales en `src/db/migrations/`.
+Las definiciones viven en `src/db/schema.ts` y el SQL inicial en `src/db/migrations/0001_init.sql`.
+
+---
+
+## Cómo se calcula el ranking
+
+- Cada juez califica de 0 al máximo en cada uno de los 6 criterios (suma máxima: 100 pts).
+- Al enviar, esa calificación queda bloqueada para ese juez/participante.
+- El **total general** de un participante es la suma de los totales de todos los jueces que ya
+  enviaron su calificación. El ranking en `/resultados` ordena por ese total general.
 
 ---
 
 ## Créditos
 
-Proyecto interno para la evaluación de aspirantes a Guías Mayores, **Zona 5 — promoción 2026**. Sin licencia pública declarada.
+Proyecto interno para el concurso de predicación de Conquistadores. Variación de gm-evalua. Sin
+licencia pública declarada.

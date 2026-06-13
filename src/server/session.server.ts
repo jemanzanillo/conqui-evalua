@@ -4,14 +4,12 @@ export type SessionData = {
   userId?: string;
 };
 
-export const SESSION_COOKIE_NAME = "gm-session";
+export const SESSION_COOKIE_NAME = "conqui-session";
 
 export function getSessionConfig() {
   const password = process.env.SESSION_SECRET;
   if (!password || password.length < 32) {
-    throw new Error(
-      "SESSION_SECRET debe estar configurada y tener al menos 32 caracteres.",
-    );
+    throw new Error("SESSION_SECRET debe estar configurada y tener al menos 32 caracteres.");
   }
   return {
     password,

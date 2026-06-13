@@ -59,9 +59,15 @@ En **Settings → Environment Variables** añade dos variables (Production + Pre
 3. Vercel te dará registros DNS (tipo A o CNAME). Cópialos a tu registrador.
 4. Espera la propagación (minutos a horas). SSL se provisiona solo.
 
-## 7. Migración de datos antiguos
+## 7. Primer ingreso
 
-Los aspirantes que tenías en `localStorage` no se migran automáticamente porque vivían solo en tu navegador. Tienes que recrearlos desde la UI tras crear tu cuenta.
+No hay registro público. Crea la primera cuenta `admin` con el script incluido:
+
+```bash
+DATABASE_URL="<DATABASE_URL>" bun scripts/create-admin.ts coordinador@ejemplo.com "Mi Nombre" "ClaveSegura123"
+```
+
+Desde el panel del Coordinador (`/admin`) crea luego las cuentas de los jueces.
 
 ## 8. Cambios futuros
 
@@ -92,4 +98,6 @@ Cada push a la rama principal del repo redespliega Vercel automáticamente. Lova
 
 - **Auth**: cookie de sesión encriptada (httpOnly, secure, sameSite=lax). Sin recuperación de password en v1 — pídeme añadirla si la necesitas (requiere Resend o similar).
 
-- **Seguridad**: cada server function valida ownership por `userId` antes de leer/escribir aspirantes y evaluaciones. No hay acceso directo desde el navegador a la BD.
+- **Seguridad**: cada server function valida la sesión (`userId`) antes de leer o escribir
+  calificaciones. Solo el rol `admin` puede crear/eliminar participantes, crear cuentas de jueces o
+  reabrir una calificación ya enviada. No hay acceso directo desde el navegador a la BD.

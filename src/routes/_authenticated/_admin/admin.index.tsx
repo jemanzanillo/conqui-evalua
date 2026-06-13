@@ -1,19 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -30,20 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { FASES } from "@/data/requisitos";
+import { PUNTAJE_MAXIMO } from "@/data/criterios";
 import {
   listUsuarios,
   listHistorial,
-  listAllAspirantes,
-  listRequisitosOverrides,
-  upsertRequisitoOverride,
-  createEvaluador,
+  listCalificacionesAdmin,
+  reabrirCalificacion,
+  createJuez,
   deleteUsuario,
 } from "@/server/admin.functions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import type { RequisitoOverride } from "@/lib/storage";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/")({
   component: AdminPage,
@@ -67,20 +57,20 @@ function AdminPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-4">
-        <Tabs defaultValue="usuarios">
+        <Tabs defaultValue="resultados">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="usuarios">Usuarios</TabsTrigger>
+            <TabsTrigger value="resultados">Resultados</TabsTrigger>
+            <TabsTrigger value="jueces">Jueces</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
-            <TabsTrigger value="requisitos">Requisitos</TabsTrigger>
           </TabsList>
-          <TabsContent value="usuarios" className="mt-4">
-            <UsuariosTab />
+          <TabsContent value="resultados" className="mt-4">
+            <ResultadosTab />
+          </TabsContent>
+          <TabsContent value="jueces" className="mt-4">
+            <JuecesTab />
           </TabsContent>
           <TabsContent value="historial" className="mt-4">
             <HistorialTab />
-          </TabsContent>
-          <TabsContent value="requisitos" className="mt-4">
-            <RequisitosTab />
           </TabsContent>
         </Tabs>
       </main>
@@ -88,7 +78,90 @@ function AdminPage() {
   );
 }
 
-function UsuariosTab() {
+function ResultadosTab() {
+  const qc = useQueryClient();
+  const { data: participantes = [], isLoading } = useQuery({
+    queryKey: ["admin-calificaciones"],
+    queryFn: () => listCalificacionesAdmin(),
+  });
+
+  const reabrirMut = useMutation({
+    mutationFn: (vars: { participanteId: string; juezId: string }) =>
+      reabrirCalificacion({ data: vars }),
+    onSuccess: () => {
+      toast.success("Calificación reabierta");
+      qc.invalidateQueries({ queryKey: ["admin-calificaciones"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  if (participantes.length === 0)
+    return <p className="text-sm text-muted-foreground">Aún no hay participantes.</p>;
+
+  return (
+    <div className="space-y-3">
+      {participantes.map((p) => (
+        <Card key={p.id} className="p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
+                {p.orden ? `#${p.orden} · ` : ""}
+                {p.nombre}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {p.zona ? `Zona ${p.zona}` : ""}
+                {p.zona && p.club ? " · " : ""}
+                {p.club ?? ""}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-lg font-bold tabular-nums">{p.totalGeneral}</p>
+              <p className="text-[10px] text-muted-foreground">total</p>
+            </div>
+          </div>
+          {p.calificaciones.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Ningún juez ha calificado aún.</p>
+          ) : (
+            <ul className="divide-y">
+              {p.calificaciones.map((c) => (
+                <li key={c.juezId} className="flex items-center justify-between gap-2 py-1.5">
+                  <span className="truncate text-sm">{c.juezNombre ?? "—"}</span>
+                  <div className="flex items-center gap-2">
+                    {c.estado === "enviado" ? (
+                      <>
+                        <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                          {c.total}/{PUNTAJE_MAXIMO}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() =>
+                            reabrirMut.mutate({ participanteId: p.id, juezId: c.juezId })
+                          }
+                          aria-label="Reabrir calificación"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        Pendiente
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function JuecesTab() {
   const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { data: usuarios = [], isLoading } = useQuery({
@@ -101,16 +174,16 @@ function UsuariosTab() {
     nombre: "",
     email: "",
     password: "",
-    rol: "evaluador" as "evaluador" | "admin",
+    rol: "juez" as "juez" | "admin",
   });
 
   const createMut = useMutation({
-    mutationFn: () => createEvaluador({ data: form }),
+    mutationFn: () => createJuez({ data: form }),
     onSuccess: () => {
       toast.success("Cuenta creada");
       qc.invalidateQueries({ queryKey: ["admin-usuarios"] });
       setOpenNew(false);
-      setForm({ nombre: "", email: "", password: "", rol: "evaluador" });
+      setForm({ nombre: "", email: "", password: "", rol: "juez" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -133,14 +206,14 @@ function UsuariosTab() {
           <DialogTrigger asChild>
             <Button size="sm">
               <Plus className="mr-1 h-4 w-4" />
-              Nuevo evaluador
+              Nuevo juez
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Crear cuenta</DialogTitle>
               <DialogDescription>
-                El evaluador podrá iniciar sesión con este correo y contraseña.
+                La persona podrá iniciar sesión con este correo y contraseña.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
@@ -171,15 +244,13 @@ function UsuariosTab() {
                 <Label>Rol</Label>
                 <Select
                   value={form.rol}
-                  onValueChange={(v) =>
-                    setForm({ ...form, rol: v as "evaluador" | "admin" })
-                  }
+                  onValueChange={(v) => setForm({ ...form, rol: v as "juez" | "admin" })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="evaluador">Evaluador</SelectItem>
+                    <SelectItem value="juez">Juez</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
@@ -192,10 +263,7 @@ function UsuariosTab() {
               <Button
                 onClick={() => createMut.mutate()}
                 disabled={
-                  createMut.isPending ||
-                  !form.nombre ||
-                  !form.email ||
-                  form.password.length < 8
+                  createMut.isPending || !form.nombre || !form.email || form.password.length < 8
                 }
               >
                 {createMut.isPending ? "Creando…" : "Crear"}
@@ -212,7 +280,7 @@ function UsuariosTab() {
               <th className="px-3 py-2">Nombre</th>
               <th className="px-3 py-2">Correo</th>
               <th className="px-3 py-2">Rol</th>
-              <th className="px-3 py-2 text-right">Aspirantes</th>
+              <th className="px-3 py-2 text-right">Enviadas</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -232,17 +300,14 @@ function UsuariosTab() {
                     {u.rol}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {u.aspirantesCount}
-                </td>
+                <td className="px-3 py-2 text-right tabular-nums">{u.enviadas}</td>
                 <td className="px-3 py-2 text-right">
                   {currentUser?.id !== u.id && (
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => {
-                        if (confirm(`¿Eliminar la cuenta de ${u.nombre}?`))
-                          deleteMut.mutate(u.id);
+                        if (confirm(`¿Eliminar la cuenta de ${u.nombre}?`)) deleteMut.mutate(u.id);
                       }}
                       aria-label="Eliminar"
                     >
@@ -260,247 +325,53 @@ function UsuariosTab() {
 }
 
 function HistorialTab() {
-  const { data: aspirantes = [] } = useQuery({
-    queryKey: ["admin-aspirantes"],
-    queryFn: () => listAllAspirantes(),
-  });
-  const [filtro, setFiltro] = useState<string>("");
   const { data: historial = [], isLoading } = useQuery({
-    queryKey: ["admin-historial", filtro],
-    queryFn: () =>
-      listHistorial({ data: filtro ? { aspiranteId: filtro } : {} }),
+    queryKey: ["admin-historial"],
+    queryFn: () => listHistorial({ data: {} }),
   });
 
-  const tituloPorReq = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const f of FASES) for (const r of f.requisitos) m.set(r.id, r.titulo);
-    return m;
-  }, []);
+  if (isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  if (historial.length === 0)
+    return <p className="text-sm text-muted-foreground">Sin registros.</p>;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Label htmlFor="filtro" className="text-xs">
-          Aspirante:
-        </Label>
-        <select
-          id="filtro"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="h-9 rounded-md border bg-background px-2 text-sm"
-        >
-          <option value="">Todos</option>
-          {aspirantes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
+    <Card className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2">Fecha</th>
+            <th className="px-3 py-2">Participante</th>
+            <th className="px-3 py-2">Juez</th>
+            <th className="px-3 py-2">Acción</th>
+            <th className="px-3 py-2 text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {historial.map((h) => (
+            <tr key={h.id} className="border-t align-top">
+              <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                {new Date(h.createdAt).toLocaleString("es-ES")}
+              </td>
+              <td className="px-3 py-2">{h.participanteNombre ?? "—"}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">{h.juezNombre ?? "—"}</td>
+              <td className="px-3 py-2">
+                <span
+                  className={
+                    h.accion === "enviado"
+                      ? "rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-700 dark:text-green-400"
+                      : "rounded-full bg-muted px-2 py-0.5 text-xs"
+                  }
+                >
+                  {h.accion}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {h.total}/{PUNTAJE_MAXIMO}
+              </td>
+            </tr>
           ))}
-        </select>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
-      ) : historial.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Sin registros.</p>
-      ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2">Fecha</th>
-                <th className="px-3 py-2">Aspirante</th>
-                <th className="px-3 py-2">Requisito</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2">Evaluador</th>
-                <th className="px-3 py-2">Motivo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historial.map((h) => (
-                <tr key={h.id} className="border-t align-top">
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
-                    {new Date(h.createdAt).toLocaleString("es-ES")}
-                  </td>
-                  <td className="px-3 py-2">{h.aspiranteNombre ?? "—"}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {tituloPorReq.get(h.requisitoId) ?? h.requisitoId}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        h.estado === "completado"
-                          ? "rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-700 dark:text-green-400"
-                          : h.estado === "incompleto"
-                            ? "rounded-full bg-destructive/15 px-2 py-0.5 text-xs text-destructive"
-                            : "rounded-full bg-muted px-2 py-0.5 text-xs"
-                      }
-                    >
-                      {h.estado}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {h.evaluadorNombre ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {h.motivo ?? ""}
-                    {h.motivo && h.comentario ? " · " : ""}
-                    {h.comentario ?? ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function RequisitosTab() {
-  const qc = useQueryClient();
-  const { data: overrides = [] } = useQuery({
-    queryKey: ["admin-overrides"],
-    queryFn: () => listRequisitosOverrides(),
-  });
-  const map = useMemo(() => {
-    const m = new Map<string, RequisitoOverride>();
-    for (const o of overrides) m.set(o.requisitoId, o);
-    return m;
-  }, [overrides]);
-
-  const [editing, setEditing] = useState<{
-    id: string;
-    titulo: string;
-    descripcion: string;
-    guia: string;
-    evidencias: string;
-  } | null>(null);
-
-  const mut = useMutation({
-    mutationFn: () => {
-      if (!editing) throw new Error("nada");
-      const evidencias = editing.evidencias
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      return upsertRequisitoOverride({
-        data: {
-          requisitoId: editing.id,
-          titulo: editing.titulo || null,
-          descripcion: editing.descripcion || null,
-          guia: editing.guia || null,
-          evidencias: evidencias.length > 0 ? evidencias : null,
-        },
-      });
-    },
-    onSuccess: () => {
-      toast.success("Cambios guardados");
-      qc.invalidateQueries({ queryKey: ["admin-overrides"] });
-      qc.invalidateQueries({ queryKey: ["requisitos-overrides"] });
-      setEditing(null);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="space-y-4">
-      {FASES.map((fase) => (
-        <Card key={fase.id} className="p-3">
-          <h3 className="mb-2 text-sm font-semibold">
-            {fase.id} · {fase.titulo}
-          </h3>
-          <ul className="divide-y">
-            {fase.requisitos.map((r) => {
-              const ov = map.get(r.id);
-              return (
-                <li key={r.id} className="flex items-center justify-between gap-2 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">
-                      {ov?.titulo ?? r.titulo}
-                      {ov && (
-                        <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">
-                          editado
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      setEditing({
-                        id: r.id,
-                        titulo: ov?.titulo ?? r.titulo ?? "",
-                        descripcion: ov?.descripcion ?? r.descripcion ?? "",
-                        guia: ov?.guia ?? r.guia ?? "",
-                        evidencias: (ov?.evidencias ?? r.evidencias ?? []).join("\n"),
-                      })
-                    }
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      ))}
-
-      <Sheet open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-          <SheetHeader className="text-left">
-            <SheetTitle>Editar requisito</SheetTitle>
-            <SheetDescription>
-              Estos cambios se ven para todos los evaluadores.
-            </SheetDescription>
-          </SheetHeader>
-          {editing && (
-            <div className="mt-4 space-y-3">
-              <div>
-                <Label>Título</Label>
-                <Input
-                  value={editing.titulo}
-                  onChange={(e) => setEditing({ ...editing, titulo: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Descripción corta</Label>
-                <Input
-                  value={editing.descripcion}
-                  onChange={(e) =>
-                    setEditing({ ...editing, descripcion: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label>Contexto / guía del manual</Label>
-                <Textarea
-                  rows={5}
-                  value={editing.guia}
-                  onChange={(e) => setEditing({ ...editing, guia: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Evidencias (una por línea)</Label>
-                <Textarea
-                  rows={6}
-                  value={editing.evidencias}
-                  onChange={(e) =>
-                    setEditing({ ...editing, evidencias: e.target.value })
-                  }
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="ghost" onClick={() => setEditing(null)}>
-                  Cancelar
-                </Button>
-                <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
-                  {mut.isPending ? "Guardando…" : "Guardar"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+        </tbody>
+      </table>
+    </Card>
   );
 }

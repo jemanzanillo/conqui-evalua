@@ -22,6 +22,6 @@ This project is a React application built with Vite and TypeScript. It leverages
 *   **State Management & Data Fetching:** `@tanstack/react-query` is used for server state management, caching, and synchronization.
 *   **UI Components:** Built using Radix UI primitives (`@radix-ui/react-*`) and extended with custom styled components in `src/components/ui`. Styling is managed with Tailwind CSS.
 *   **Form Handling:** Implemented with `react-hook-form`, often paired with `zod` for schema validation through `@hookform/resolvers`.
-*   **Application Logic:** Custom hooks are found in `src/hooks/` (e.g., `useAspirantes.ts`, `useEvaluacion.ts`), and utility functions reside in `src/lib/` (e.g., `scoring.ts`, `storage.ts`, `utils.ts`). Data definitions are in `src/data/`.
+*   **Application Logic:** Custom hooks are found in `src/hooks/` (e.g., `useParticipantes.ts`, `useCalificacion.ts`), and utility functions reside in `src/lib/` (e.g., `scoring.ts`, `storage.ts`, `utils.ts`). Data definitions are in `src/data/`.
 *   **Entry Points:** The main application entry is `src/main.tsx`, which renders the `App` component (`src/App.tsx`).
 *   **Deployment Target:** The project is configured for deployment on Cloudflare Workers, indicated by the `@cloudflare/vite-plugin` dependency.

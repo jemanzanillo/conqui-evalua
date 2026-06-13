@@ -48,8 +48,8 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <Card className="w-full max-w-sm p-6">
         <div className="mb-4 text-center">
-          <h1 className="text-xl font-bold">Evaluación GM</h1>
-          <p className="text-xs text-muted-foreground">Hoja de cotejo Z5 2026</p>
+          <h1 className="text-xl font-bold">Concurso de Predicación</h1>
+          <p className="text-xs text-muted-foreground">Acceso para jueces</p>
         </div>
         <SignInForm onSuccess={onSuccess} />
         <p className="mt-4 text-center text-[11px] text-muted-foreground">

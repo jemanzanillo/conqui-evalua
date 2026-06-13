@@ -9,14 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ResultadosRouteImport } from './routes/resultados'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as ObservadorTokenRouteImport } from './routes/observador.$token'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/_admin'
-import { Route as AuthenticatedAspiranteIdRouteImport } from './routes/_authenticated/aspirante.$id'
+import { Route as AuthenticatedParticipanteIdRouteImport } from './routes/_authenticated/participante.$id'
 import { Route as AuthenticatedAdminAdminIndexRouteImport } from './routes/_authenticated/_admin/admin.index'
 
+const ResultadosRoute = ResultadosRouteImport.update({
+  id: '/resultados',
+  path: '/resultados',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -31,19 +36,14 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const ObservadorTokenRoute = ObservadorTokenRouteImport.update({
-  id: '/observador/$token',
-  path: '/observador/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/_admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAspiranteIdRoute =
-  AuthenticatedAspiranteIdRouteImport.update({
-    id: '/aspirante/$id',
-    path: '/aspirante/$id',
+const AuthenticatedParticipanteIdRoute =
+  AuthenticatedParticipanteIdRouteImport.update({
+    id: '/participante/$id',
+    path: '/participante/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAdminAdminIndexRoute =
@@ -56,56 +56,58 @@ const AuthenticatedAdminAdminIndexRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
-  '/observador/$token': typeof ObservadorTokenRoute
-  '/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/resultados': typeof ResultadosRoute
+  '/participante/$id': typeof AuthenticatedParticipanteIdRoute
   '/admin/': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/resultados': typeof ResultadosRoute
   '/': typeof AuthenticatedIndexRoute
-  '/observador/$token': typeof ObservadorTokenRoute
-  '/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/participante/$id': typeof AuthenticatedParticipanteIdRoute
   '/admin': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/resultados': typeof ResultadosRoute
   '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
-  '/observador/$token': typeof ObservadorTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/aspirante/$id': typeof AuthenticatedAspiranteIdRoute
+  '/_authenticated/participante/$id': typeof AuthenticatedParticipanteIdRoute
   '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/login'
-    | '/observador/$token'
-    | '/aspirante/$id'
-    | '/admin/'
+  fullPaths: '/' | '/login' | '/resultados' | '/participante/$id' | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/' | '/observador/$token' | '/aspirante/$id' | '/admin'
+  to: '/login' | '/resultados' | '/' | '/participante/$id' | '/admin'
   id:
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/resultados'
     | '/_authenticated/_admin'
-    | '/observador/$token'
     | '/_authenticated/'
-    | '/_authenticated/aspirante/$id'
+    | '/_authenticated/participante/$id'
     | '/_authenticated/_admin/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
-  ObservadorTokenRoute: typeof ObservadorTokenRoute
+  ResultadosRoute: typeof ResultadosRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/resultados': {
+      id: '/resultados'
+      path: '/resultados'
+      fullPath: '/resultados'
+      preLoaderRoute: typeof ResultadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -127,13 +129,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/observador/$token': {
-      id: '/observador/$token'
-      path: '/observador/$token'
-      fullPath: '/observador/$token'
-      preLoaderRoute: typeof ObservadorTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated/_admin': {
       id: '/_authenticated/_admin'
       path: ''
@@ -141,11 +136,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/aspirante/$id': {
-      id: '/_authenticated/aspirante/$id'
-      path: '/aspirante/$id'
-      fullPath: '/aspirante/$id'
-      preLoaderRoute: typeof AuthenticatedAspiranteIdRouteImport
+    '/_authenticated/participante/$id': {
+      id: '/_authenticated/participante/$id'
+      path: '/participante/$id'
+      fullPath: '/participante/$id'
+      preLoaderRoute: typeof AuthenticatedParticipanteIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/_admin/admin/': {
@@ -172,13 +167,13 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedAspiranteIdRoute: typeof AuthenticatedAspiranteIdRoute
+  AuthenticatedParticipanteIdRoute: typeof AuthenticatedParticipanteIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedAspiranteIdRoute: AuthenticatedAspiranteIdRoute,
+  AuthenticatedParticipanteIdRoute: AuthenticatedParticipanteIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -188,7 +183,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
-  ObservadorTokenRoute: ObservadorTokenRoute,
+  ResultadosRoute: ResultadosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

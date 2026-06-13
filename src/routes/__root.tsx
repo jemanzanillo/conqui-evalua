@@ -41,20 +41,23 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Evaluación Guías Mayores Z5" },
+      { title: "Concurso de Predicación" },
       {
         name: "description",
         content:
-          "Aplicación mobile-first para evaluación presencial de aspirantes a Guías Mayores.",
+          "Aplicación mobile-first para calificar el concurso de predicación de Conquistadores.",
       },
-      { property: "og:title", content: "Evaluación Guías Mayores Z5" },
-      { name: "twitter:title", content: "Evaluación Guías Mayores Z5" },
-      { name: "description", content: "Web app for evaluating aspiring Master Guides, digitizing in-person assessments." },
-      { property: "og:description", content: "Web app for evaluating aspiring Master Guides, digitizing in-person assessments." },
-      { name: "twitter:description", content: "Web app for evaluating aspiring Master Guides, digitizing in-person assessments." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3bcb8ae4-26ba-489a-8a12-24d857d76289/id-preview-a62ead11--25e26c2c-e1b4-49bb-888e-4bf05cadc172.lovable.app-1777067408541.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3bcb8ae4-26ba-489a-8a12-24d857d76289/id-preview-a62ead11--25e26c2c-e1b4-49bb-888e-4bf05cadc172.lovable.app-1777067408541.png" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Concurso de Predicación" },
+      { name: "twitter:title", content: "Concurso de Predicación" },
+      {
+        property: "og:description",
+        content: "Web app para calificar el concurso de predicación de Conquistadores en vivo.",
+      },
+      {
+        name: "twitter:description",
+        content: "Web app para calificar el concurso de predicación de Conquistadores en vivo.",
+      },
+      { name: "twitter:card", content: "summary" },
       { property: "og:type", content: "website" },
     ],
     links: [

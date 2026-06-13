@@ -1,17 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
-import { desc, eq, sql as sqlOp } from "drizzle-orm";
+import { and, asc, desc, eq, sql as sqlOp } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/db/client.server";
-import {
-  aspirantes,
-  historialEvaluaciones,
-  requisitosOverrides,
-  usuarios,
-} from "@/db/schema";
+import { calificaciones, historialCalificaciones, participantes, usuarios } from "@/db/schema";
+import { totalCalificacion } from "@/lib/scoring";
 import { getSessionConfig, type SessionData } from "./session.server";
-import type { RequisitoOverride } from "@/lib/storage";
+import type { Puntos } from "@/lib/storage";
 
 async function requireAdminId(): Promise<string> {
   const session = await useSession<SessionData>(getSessionConfig());
@@ -26,177 +22,36 @@ async function requireAdminId(): Promise<string> {
   return userId;
 }
 
-export const listUsuarios = createServerFn({ method: "GET" }).handler(
-  async () => {
-    await requireAdminId();
-    const rows = await db
-      .select({
-        id: usuarios.id,
-        nombre: usuarios.nombre,
-        email: usuarios.email,
-        rol: usuarios.rol,
-        createdAt: usuarios.createdAt,
-        aspirantesCount: sqlOp<number>`COUNT(${aspirantes.id})::int`,
-      })
-      .from(usuarios)
-      .leftJoin(aspirantes, eq(aspirantes.ownerId, usuarios.id))
-      .groupBy(usuarios.id)
-      .orderBy(usuarios.nombre);
-    return rows.map((r) => ({
-      ...r,
-      createdAt: r.createdAt.toISOString(),
-    }));
-  },
-);
-
-export const listHistorial = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        aspiranteId: z.string().uuid().optional(),
-        limit: z.number().int().min(1).max(500).optional(),
-      })
-      .parse(input ?? {}),
-  )
-  .handler(async ({ data }) => {
-    await requireAdminId();
-    const limit = data.limit ?? 200;
-
-    const baseSelect = {
-      id: historialEvaluaciones.id,
-      aspiranteId: historialEvaluaciones.aspiranteId,
-      aspiranteNombre: aspirantes.nombre,
-      requisitoId: historialEvaluaciones.requisitoId,
-      evaluadorId: historialEvaluaciones.evaluadorId,
-      evaluadorNombre: usuarios.nombre,
-      estado: historialEvaluaciones.estado,
-      seleccionados: historialEvaluaciones.seleccionados,
-      motivo: historialEvaluaciones.motivo,
-      comentario: historialEvaluaciones.comentario,
-      createdAt: historialEvaluaciones.createdAt,
-    };
-
-    const rows = data.aspiranteId
-      ? await db
-          .select(baseSelect)
-          .from(historialEvaluaciones)
-          .leftJoin(usuarios, eq(historialEvaluaciones.evaluadorId, usuarios.id))
-          .leftJoin(aspirantes, eq(historialEvaluaciones.aspiranteId, aspirantes.id))
-          .where(eq(historialEvaluaciones.aspiranteId, data.aspiranteId))
-          .orderBy(desc(historialEvaluaciones.createdAt))
-          .limit(limit)
-      : await db
-          .select(baseSelect)
-          .from(historialEvaluaciones)
-          .leftJoin(usuarios, eq(historialEvaluaciones.evaluadorId, usuarios.id))
-          .leftJoin(aspirantes, eq(historialEvaluaciones.aspiranteId, aspirantes.id))
-          .orderBy(desc(historialEvaluaciones.createdAt))
-          .limit(limit);
-
-    return rows.map((r) => ({
-      ...r,
-      createdAt: r.createdAt.toISOString(),
-    }));
-  });
-
-export const listAllAspirantes = createServerFn({ method: "GET" }).handler(
-  async () => {
-    await requireAdminId();
-    const rows = await db
-      .select({
-        id: aspirantes.id,
-        nombre: aspirantes.nombre,
-        zona: aspirantes.zona,
-        club: aspirantes.club,
-        ownerId: aspirantes.ownerId,
-        ownerNombre: usuarios.nombre,
-      })
-      .from(aspirantes)
-      .leftJoin(usuarios, eq(aspirantes.ownerId, usuarios.id))
-      .orderBy(aspirantes.nombre);
-    return rows;
-  },
-);
-
-export const listRequisitosOverrides = createServerFn({ method: "GET" }).handler(
-  async (): Promise<RequisitoOverride[]> => {
-    await requireAdminId();
-    const rows = await db.select().from(requisitosOverrides);
-    return rows.map((r) => ({
-      requisitoId: r.requisitoId,
-      titulo: r.titulo,
-      descripcion: r.descripcion,
-      guia: r.guia,
-      evidencias: r.evidencias ?? null,
-    }));
-  },
-);
-
-const overrideSchema = z.object({
-  requisitoId: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/),
-  titulo: z.string().max(300).nullable().optional(),
-  descripcion: z.string().max(1000).nullable().optional(),
-  guia: z.string().max(4000).nullable().optional(),
-  evidencias: z.array(z.string().min(1).max(500)).max(30).nullable().optional(),
-});
-
-export const upsertRequisitoOverride = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => overrideSchema.parse(input))
-  .handler(async ({ data }) => {
-    const adminId = await requireAdminId();
-    const now = new Date();
-
-    const updateSet: Record<string, unknown> = {
-      updatedAt: now,
-      updatedBy: adminId,
-    };
-    if (data.titulo !== undefined) updateSet.titulo = data.titulo;
-    if (data.descripcion !== undefined) updateSet.descripcion = data.descripcion;
-    if (data.guia !== undefined) updateSet.guia = data.guia;
-    if (data.evidencias !== undefined) updateSet.evidencias = data.evidencias;
-
-    await db
-      .insert(requisitosOverrides)
-      .values({
-        requisitoId: data.requisitoId,
-        titulo: data.titulo ?? null,
-        descripcion: data.descripcion ?? null,
-        guia: data.guia ?? null,
-        evidencias: data.evidencias ?? null,
-        updatedBy: adminId,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: requisitosOverrides.requisitoId,
-        set: updateSet,
-      });
-
-    return { ok: true };
-  });
-
-// Pública (no admin) — la usan también evaluadores/observadores para ver el manual con overrides aplicados.
-export const listRequisitosOverridesPublic = createServerFn({
-  method: "GET",
-}).handler(async (): Promise<RequisitoOverride[]> => {
-  const rows = await db.select().from(requisitosOverrides);
+export const listUsuarios = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdminId();
+  const rows = await db
+    .select({
+      id: usuarios.id,
+      nombre: usuarios.nombre,
+      email: usuarios.email,
+      rol: usuarios.rol,
+      createdAt: usuarios.createdAt,
+      enviadas: sqlOp<number>`COUNT(${calificaciones.id}) FILTER (WHERE ${calificaciones.estado} = 'enviado')::int`,
+    })
+    .from(usuarios)
+    .leftJoin(calificaciones, eq(calificaciones.juezId, usuarios.id))
+    .groupBy(usuarios.id)
+    .orderBy(usuarios.nombre);
   return rows.map((r) => ({
-    requisitoId: r.requisitoId,
-    titulo: r.titulo,
-    descripcion: r.descripcion,
-    guia: r.guia,
-    evidencias: r.evidencias ?? null,
+    ...r,
+    createdAt: r.createdAt.toISOString(),
   }));
 });
 
-const createEvaluadorSchema = z.object({
+const createJuezSchema = z.object({
   nombre: z.string().trim().min(1).max(120),
   email: z.string().email().max(255).toLowerCase(),
   password: z.string().min(8).max(200),
-  rol: z.enum(["evaluador", "admin"]).default("evaluador"),
+  rol: z.enum(["juez", "admin"]).default("juez"),
 });
 
-export const createEvaluador = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => createEvaluadorSchema.parse(input))
+export const createJuez = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createJuezSchema.parse(input))
   .handler(async ({ data }) => {
     await requireAdminId();
 
@@ -228,9 +83,7 @@ export const createEvaluador = createServerFn({ method: "POST" })
   });
 
 export const deleteUsuario = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const adminId = await requireAdminId();
     if (data.id === adminId) {
@@ -238,4 +91,169 @@ export const deleteUsuario = createServerFn({ method: "POST" })
     }
     await db.delete(usuarios).where(eq(usuarios.id, data.id));
     return { ok: true };
+  });
+
+export type AdminCalificacion = {
+  juezId: string;
+  juezNombre: string | null;
+  estado: "pendiente" | "enviado";
+  submittedAt: string | null;
+  total: number;
+  puntos: Record<string, number>;
+};
+
+export type AdminParticipante = {
+  id: string;
+  nombre: string;
+  club: string | null;
+  zona: number | null;
+  orden: number | null;
+  totalGeneral: number;
+  calificaciones: AdminCalificacion[];
+};
+
+// Vista completa para el Coordinador: todos los participantes con la
+// calificación de cada juez (enviada o pendiente).
+export const listCalificacionesAdmin = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<AdminParticipante[]> => {
+  await requireAdminId();
+
+  const participantesRows = await db
+    .select()
+    .from(participantes)
+    .orderBy(asc(participantes.orden), asc(participantes.nombre));
+
+  const calRows = await db
+    .select({
+      participanteId: calificaciones.participanteId,
+      juezId: calificaciones.juezId,
+      juezNombre: usuarios.nombre,
+      estado: calificaciones.estado,
+      submittedAt: calificaciones.submittedAt,
+      puntos: calificaciones.puntos,
+    })
+    .from(calificaciones)
+    .leftJoin(usuarios, eq(calificaciones.juezId, usuarios.id));
+
+  const porParticipante = new Map<string, AdminCalificacion[]>();
+  for (const row of calRows) {
+    const puntos = (row.puntos ?? {}) as Puntos;
+    const entry: AdminCalificacion = {
+      juezId: row.juezId,
+      juezNombre: row.juezNombre,
+      estado: row.estado as "pendiente" | "enviado",
+      submittedAt: row.submittedAt ? row.submittedAt.toISOString() : null,
+      total: totalCalificacion(puntos),
+      puntos,
+    };
+    const list = porParticipante.get(row.participanteId) ?? [];
+    list.push(entry);
+    porParticipante.set(row.participanteId, list);
+  }
+
+  return participantesRows.map((p) => {
+    const cals = porParticipante.get(p.id) ?? [];
+    const totalGeneral = cals
+      .filter((c) => c.estado === "enviado")
+      .reduce((acc, c) => acc + c.total, 0);
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      club: p.club,
+      zona: p.zona,
+      orden: p.orden,
+      totalGeneral,
+      calificaciones: cals,
+    };
+  });
+});
+
+const reabrirSchema = z.object({
+  participanteId: z.string().uuid(),
+  juezId: z.string().uuid(),
+});
+
+// Permite al Coordinador reabrir una calificación ya enviada para que el
+// juez pueda corregirla.
+export const reabrirCalificacion = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => reabrirSchema.parse(input))
+  .handler(async ({ data }) => {
+    const adminId = await requireAdminId();
+
+    const [current] = await db
+      .select()
+      .from(calificaciones)
+      .where(
+        and(
+          eq(calificaciones.participanteId, data.participanteId),
+          eq(calificaciones.juezId, data.juezId),
+        ),
+      )
+      .limit(1);
+
+    if (!current) throw new Error("No hay calificación para reabrir.");
+
+    await db
+      .update(calificaciones)
+      .set({ estado: "pendiente", submittedAt: null, updatedAt: new Date() })
+      .where(eq(calificaciones.id, current.id));
+
+    await db.insert(historialCalificaciones).values({
+      participanteId: data.participanteId,
+      juezId: data.juezId,
+      accion: "reabierto",
+      puntos: (current.puntos ?? {}) as Puntos,
+      actorId: adminId,
+    });
+
+    return { ok: true };
+  });
+
+const historialSchema = z
+  .object({
+    participanteId: z.string().uuid().optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  })
+  .optional();
+
+export const listHistorial = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => historialSchema.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdminId();
+    const limit = data?.limit ?? 200;
+
+    const baseSelect = {
+      id: historialCalificaciones.id,
+      participanteId: historialCalificaciones.participanteId,
+      participanteNombre: participantes.nombre,
+      juezId: historialCalificaciones.juezId,
+      juezNombre: usuarios.nombre,
+      accion: historialCalificaciones.accion,
+      puntos: historialCalificaciones.puntos,
+      createdAt: historialCalificaciones.createdAt,
+    };
+
+    const rows = data?.participanteId
+      ? await db
+          .select(baseSelect)
+          .from(historialCalificaciones)
+          .leftJoin(usuarios, eq(historialCalificaciones.juezId, usuarios.id))
+          .leftJoin(participantes, eq(historialCalificaciones.participanteId, participantes.id))
+          .where(eq(historialCalificaciones.participanteId, data.participanteId))
+          .orderBy(desc(historialCalificaciones.createdAt))
+          .limit(limit)
+      : await db
+          .select(baseSelect)
+          .from(historialCalificaciones)
+          .leftJoin(usuarios, eq(historialCalificaciones.juezId, usuarios.id))
+          .leftJoin(participantes, eq(historialCalificaciones.participanteId, participantes.id))
+          .orderBy(desc(historialCalificaciones.createdAt))
+          .limit(limit);
+
+    return rows.map((r) => ({
+      ...r,
+      total: totalCalificacion((r.puntos ?? {}) as Puntos),
+      createdAt: r.createdAt.toISOString(),
+    }));
   });
