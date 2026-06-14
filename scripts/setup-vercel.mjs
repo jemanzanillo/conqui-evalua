@@ -24,12 +24,10 @@ cpSync('dist/server', funcDir, { recursive: true });
 // Vercel requires the entry point to be named index.js
 writeFileSync(`${funcDir}/index.js`, readFileSync(`${funcDir}/server.js`));
 
-// Node.js 20 runtime config for the function
+// Edge runtime config — TanStack Start's Vercel adapter exports a fetch handler
 writeFileSync(`${funcDir}/.vc-config.json`, JSON.stringify({
-  runtime: 'nodejs20.x',
-  handler: 'index.js',
-  launcherType: 'Nodejs',
-  shouldAddHelpers: true,
+  runtime: 'edge',
+  entrypoint: 'index.js',
 }));
 
 // Routing: serve static files first, then fall through to the SSR function
