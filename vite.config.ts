@@ -9,4 +9,7 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({ target: "vercel" }),
   ],
+  ssr: {
+    noExternal: true,
+  },
 });
