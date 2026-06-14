@@ -60,7 +60,16 @@ export default async function handler(req, res) {
   const webRes = await fetchHandler(webReq);
 
   res.statusCode = webRes.status;
-  for (const [k, v] of webRes.headers.entries()) res.setHeader(k, v);
+
+  // headers.entries() hides set-cookie per the Fetch API spec.
+  // Forward all other headers normally, then handle cookies explicitly.
+  for (const [k, v] of webRes.headers.entries()) {
+    if (k.toLowerCase() !== 'set-cookie') res.setHeader(k, v);
+  }
+  if (typeof webRes.headers.getSetCookie === 'function') {
+    const cookies = webRes.headers.getSetCookie();
+    if (cookies.length > 0) res.setHeader('set-cookie', cookies);
+  }
 
   if (webRes.body) {
     const reader = webRes.body.getReader();
