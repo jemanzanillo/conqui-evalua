@@ -45,6 +45,12 @@ export const signIn = createServerFn({ method: "POST" })
 
     const session = await useSession<SessionData>(getSessionConfig());
     await session.update({ userId: user.id });
+    // TEMP DEBUG — remove once login is confirmed working
+    console.log(
+      "[signIn] user.id:", user.id,
+      "| post-update session.data:", JSON.stringify(session.data),
+      "| secretLen:", process.env.SESSION_SECRET?.length,
+    );
 
     return {
       id: user.id,
@@ -71,7 +77,10 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
   }
   const userId = session.data.userId;
   // TEMP DEBUG — remove once login is confirmed working
-  console.log("[getCurrentUser] session userId:", userId ?? "(none)");
+  console.log(
+    "[getCurrentUser] session.data:", JSON.stringify(session.data),
+    "| secretLen:", process.env.SESSION_SECRET?.length,
+  );
   if (!userId) return null;
 
   const [user] = await db
