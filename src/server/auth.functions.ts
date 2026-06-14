@@ -61,7 +61,14 @@ export const signOut = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useSession<SessionData>(getSessionConfig());
+  let session;
+  try {
+    session = await useSession<SessionData>(getSessionConfig());
+  } catch (e) {
+    // TEMP DEBUG — remove once login is confirmed working
+    console.log("[getCurrentUser] useSession THREW:", (e as Error)?.message, "|", (e as Error)?.stack?.split("\n")[1]?.trim());
+    throw e;
+  }
   const userId = session.data.userId;
   // TEMP DEBUG — remove once login is confirmed working
   console.log("[getCurrentUser] session userId:", userId ?? "(none)");
