@@ -45,10 +45,6 @@ export default async function handler(req, res) {
   for await (const chunk of req) bodyChunks.push(chunk);
   const body = Buffer.concat(bodyChunks);
 
-  // TEMP DEBUG — remove once login is confirmed working
-  const cookieHeader = req.headers.cookie ?? '';
-  console.log('[adapter]', req.method, req.url, 'cookieLen:', cookieHeader.length, 'hasSession:', cookieHeader.includes('conqui-session'));
-
   const webReq = new Request(url, {
     method: req.method ?? 'GET',
     headers: Object.fromEntries(

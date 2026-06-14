@@ -45,12 +45,6 @@ export const signIn = createServerFn({ method: "POST" })
 
     const session = await useSession<SessionData>(getSessionConfig());
     await session.update({ userId: user.id });
-    // TEMP DEBUG — remove once login is confirmed working
-    console.log(
-      "[signIn] user.id:", user.id,
-      "| post-update session.data:", JSON.stringify(session.data),
-      "| secretLen:", process.env.SESSION_SECRET?.length,
-    );
 
     return {
       id: user.id,
@@ -67,20 +61,8 @@ export const signOut = createServerFn({ method: "POST" }).handler(async () => {
 });
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
-  let session;
-  try {
-    session = await useSession<SessionData>(getSessionConfig());
-  } catch (e) {
-    // TEMP DEBUG — remove once login is confirmed working
-    console.log("[getCurrentUser] useSession THREW:", (e as Error)?.message, "|", (e as Error)?.stack?.split("\n")[1]?.trim());
-    throw e;
-  }
+  const session = await useSession<SessionData>(getSessionConfig());
   const userId = session.data.userId;
-  // TEMP DEBUG — remove once login is confirmed working
-  console.log(
-    "[getCurrentUser] session.data:", JSON.stringify(session.data),
-    "| secretLen:", process.env.SESSION_SECRET?.length,
-  );
   if (!userId) return null;
 
   const [user] = await db
